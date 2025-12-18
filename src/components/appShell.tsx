@@ -1,10 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { Container } from "./ui";
+import { usePathname, useRouter } from "next/navigation";
+import { Container, Button } from "./ui";
 import { cn } from "./utils";
-import { Home, Upload, Sparkles, Clock, Users, User, Settings } from "lucide-react";
+import { Home, Upload, Sparkles, Clock, User, Settings, LogOut, ShieldCheck } from "lucide-react";
+import { useAuth } from "./AuthProvider";
+import { signOut } from "firebase/auth";
+import { auth } from "@/lib/firebase";
+import { useState } from "react";
 
 const nav = [
   { href: "/app", label: "Overview", icon: Home },
@@ -17,37 +21,66 @@ const nav = [
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
+  const router = useRouter();
+  const { user } = useAuth();
+  const [signingOut, setSigningOut] = useState(false);
+
+  async function handleLogout() {
+    setSigningOut(true);
+    try {
+      await signOut(auth);
+    } finally {
+      router.push("/login");
+      setSigningOut(false);
+    }
+  }
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen pb-10">
       <div className="pointer-events-none fixed inset-0 -z-10">
-        <div className="absolute left-1/2 top-[-120px] h-[380px] w-[780px] -translate-x-1/2 rounded-full bg-cyan-400/10 blur-3xl" />
-        <div className="absolute right-[-120px] bottom-[-180px] h-[420px] w-[520px] rounded-full bg-fuchsia-400/10 blur-3xl" />
+        <div className="absolute left-1/2 top-[-180px] h-[420px] w-[900px] -translate-x-1/2 rounded-full bg-cyan-400/10 blur-3xl" />
+        <div className="absolute right-[-180px] bottom-[-200px] h-[520px] w-[600px] rounded-full bg-fuchsia-400/10 blur-3xl" />
       </div>
 
-      <header className="sticky top-0 z-20 border-b border-white/10 bg-zinc-950/60 backdrop-blur">
+      <header className="sticky top-0 z-30 border-b border-white/10 bg-[#060810]/80 backdrop-blur-xl">
         <Container>
           <div className="flex items-center justify-between py-4">
-            <Link href="/" className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-xl bg-cyan-400/20 border border-cyan-300/25" />
-              <div className="font-black tracking-tight">DealAI</div>
-              <span className="text-xs text-white/50">web</span>
+            <Link href="/" className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-cyan-300/20 bg-cyan-400/15 text-cyan-100 shadow-lg shadow-cyan-500/10">
+                <ShieldCheck size={20} />
+              </div>
+              <div>
+                <div className="text-lg font-semibold tracking-tight">DealAI</div>
+                <div className="text-xs uppercase text-white/50">Private deals</div>
+              </div>
             </Link>
-            <div className="flex items-center gap-2">
-              <Link href="/pricing" className="text-sm text-white/70 hover:text-white">Pricing</Link>
-              <Link href="/app/upload" className="rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold border border-white/10 hover:bg-white/15">
-                Open App
-              </Link>
+
+            <div className="flex items-center gap-3">
+              <div className="hidden sm:flex items-center gap-3 rounded-full border border-white/10 bg-white/5 px-3 py-1.5">
+                <div className="h-8 w-8 rounded-full bg-gradient-to-br from-white/20 to-white/5" />
+                <div className="leading-tight">
+                  <div className="text-sm font-semibold text-white/90">{user?.displayName || "Member"}</div>
+                  <div className="text-xs text-white/60">{user?.email}</div>
+                </div>
+              </div>
+              <Button
+                onClick={handleLogout}
+                variant="ghost"
+                className="border border-white/10 bg-white/5 px-3 py-2 text-sm"
+                disabled={signingOut}
+              >
+                <LogOut size={16} /> {signingOut ? "Signing out" : "Logout"}
+              </Button>
             </div>
           </div>
         </Container>
       </header>
 
       <Container>
-        <div className="grid grid-cols-1 gap-6 py-6 md:grid-cols-[240px_1fr]">
-          <aside className="glass rounded-2xl p-3 h-fit md:sticky md:top-[88px]">
-            <div className="px-3 py-2 text-xs uppercase tracking-widest text-white/40">Navigation</div>
-            <nav className="flex flex-col">
+        <div className="grid grid-cols-1 gap-6 py-6 lg:grid-cols-[250px_1fr]">
+          <aside className="glass rounded-2xl p-4 h-fit lg:sticky lg:top-[92px]">
+            <div className="px-2 pb-2 text-[11px] uppercase tracking-[0.25em] text-white/50">Navigate</div>
+            <nav className="flex flex-col gap-1">
               {nav.map((n) => {
                 const active = path === n.href;
                 const Icon = n.icon;
@@ -56,25 +89,28 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     key={n.href}
                     href={n.href}
                     className={cn(
-                      "flex items-center gap-3 rounded-xl px-3 py-2 text-sm border border-transparent hover:bg-white/5",
-                      active && "bg-white/7 border-white/10"
+                      "group flex items-center gap-3 rounded-xl px-3 py-2 text-sm transition border border-transparent hover:border-white/10 hover:bg-white/5",
+                      active && "border-white/10 bg-white/10 shadow-inner shadow-cyan-500/10"
                     )}
                   >
-                    <Icon size={18} className={cn(active ? "text-cyan-200" : "text-white/60")} />
+                    <Icon
+                      size={18}
+                      className={cn("transition", active ? "text-cyan-200" : "text-white/60 group-hover:text-white")}
+                    />
                     <span className={cn(active ? "text-white" : "text-white/80")}>{n.label}</span>
                   </Link>
                 );
               })}
             </nav>
-            <div className="mt-3 rounded-xl bg-white/5 border border-white/10 p-3">
-              <div className="text-sm font-semibold">Tip</div>
+            <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-3">
+              <div className="text-sm font-semibold">Fast path</div>
               <div className="mt-1 text-xs text-white/60">
                 Start with <span className="text-white/80">Upload</span>, then hit <span className="text-white/80">Analyze</span>.
               </div>
             </div>
           </aside>
 
-          <main className="min-w-0">{children}</main>
+          <main className="min-w-0 space-y-4">{children}</main>
         </div>
       </Container>
     </div>

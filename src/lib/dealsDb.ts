@@ -1,3 +1,4 @@
+// src/lib/dealsDb.ts
 import { db } from "@/lib/firebase";
 import {
   addDoc,
@@ -10,8 +11,9 @@ import {
   runTransaction,
   serverTimestamp,
   setDoc,
-  Timestamp,
   type DocumentData,
+  type FieldValue,
+  type Timestamp,
 } from "firebase/firestore";
 
 export type DealAnalysis = {
@@ -31,12 +33,14 @@ export type DealDocument = {
   location?: string;
   imageUrl?: string;
   analysis: DealAnalysis;
-  createdAt?: Timestamp | null;
+  // serverTimestamp() is a FieldValue; once written, Firestore returns a Timestamp.
+  createdAt?: Timestamp | FieldValue | null;
 };
 
 export async function saveDeal(uid: string, deal: DealDocument): Promise<string> {
   const col = collection(db, "users", uid, "deals");
-  const data: Omit<DealDocument, "id"> & { createdAt: Timestamp | ReturnType<typeof serverTimestamp> } = {
+
+  const data: Omit<DealDocument, "id"> & { createdAt: Timestamp | FieldValue } = {
     ...deal,
     createdAt: deal.createdAt ?? serverTimestamp(),
   };
@@ -65,9 +69,11 @@ export async function listDeals(uid: string, take = 50): Promise<DealDocument[]>
 
 export async function refreshDealAnalysis(uid: string, dealId: string, analysis: DealAnalysis) {
   const ref = doc(db, "users", uid, "deals", dealId);
+
   await runTransaction(db, async (tx) => {
     const snap = await tx.get(ref);
     if (!snap.exists()) return;
+
     tx.set(
       ref,
       {

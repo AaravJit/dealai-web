@@ -55,26 +55,55 @@ export default function AnalyzePage() {
         });
 
         const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-        if (!res.ok)
+        if (!res.ok) {
           throw new Error(
-            (typeof data.detail === "string" && data.detail) || (typeof data.error === "string" && data.error) || "Analyze failed"
+            (typeof data.detail === "string" && data.detail) ||
+              (typeof data.error === "string" && data.error) ||
+              "Analyze failed"
           );
+        }
+
+        // ---- ✅ Coerce/validate fields that must be strings ----
+        const safeTitle =
+          typeof data.title === "string" && data.title.trim()
+            ? data.title.trim()
+            : typeof title === "string" && title.trim()
+              ? title.trim()
+              : "Untitled listing";
+
+        const safeLocation =
+          typeof data.location === "string" && data.location.trim()
+            ? data.location.trim()
+            : typeof loc === "string" && loc.trim()
+              ? loc.trim()
+              : "Unknown";
+
+        const safeConfidence =
+          typeof data.confidence === "string" ? data.confidence : "medium";
+
+        const safeCondition =
+          typeof data.condition === "string" ? data.condition : "good";
+
+        const safeNegotiation =
+          typeof data.negotiationMessage === "string" && data.negotiationMessage.trim()
+            ? data.negotiationMessage
+            : "Thanks for the listing. Would you consider a small discount today?";
 
         const analysis = {
           dealScore: typeof data.dealScore === "number" ? data.dealScore : 50,
           marketValue: typeof data.marketValue === "number" ? data.marketValue : 0,
-          confidence: data.confidence ?? "medium",
-          condition: data.condition ?? "good",
+          confidence: safeConfidence,
+          condition: safeCondition,
           scamFlags: Array.isArray(data.scamFlags) ? data.scamFlags.map(String) : [],
-          negotiationMessage: data.negotiationMessage ?? "Thanks for the listing. Would you consider a small discount today?",
+          negotiationMessage: safeNegotiation,
           reasoning: Array.isArray(data.reasoning) ? data.reasoning.map(String) : [],
         } as DealDocument["analysis"];
 
         const doc: DealDocument & { imageDataUrl?: string } = {
           id: existingDealId ?? undefined,
-          title: data.title ?? title ?? "Untitled listing",
+          title: safeTitle,
           sellerPrice: typeof data.sellerPrice === "number" ? data.sellerPrice : price,
-          location: data.location ?? loc ?? "Unknown",
+          location: safeLocation,
           imageUrl,
           analysis,
           imageDataUrl: img,
@@ -125,7 +154,9 @@ export default function AnalyzePage() {
     return (
       <Card>
         <div className="text-2xl font-black tracking-tight">Analyzing…</div>
-        <div className="mt-2 text-white/70 text-sm">Running comps, detecting red flags, generating a counter-offer.</div>
+        <div className="mt-2 text-white/70 text-sm">
+          Running comps, detecting red flags, generating a counter-offer.
+        </div>
         <div className="mt-6 h-2 w-full overflow-hidden rounded-full bg-white/10">
           <div className="h-full w-2/3 bg-cyan-300/30 animate-pulse" />
         </div>
@@ -194,7 +225,10 @@ export default function AnalyzePage() {
 
         <div className="mt-5 grid gap-4 md:grid-cols-4">
           <Metric label="Deal Score" value={`${deal.analysis.dealScore}/100`} />
-          <Metric label="Seller Price" value={deal.sellerPrice ? `$${deal.sellerPrice.toLocaleString()}` : "Unknown"} />
+          <Metric
+            label="Seller Price"
+            value={deal.sellerPrice ? `$${deal.sellerPrice.toLocaleString()}` : "Unknown"}
+          />
           <Metric label="Market Value" value={`$${deal.analysis.marketValue.toLocaleString()}`} />
           <Metric label="Confidence" value={deal.analysis.confidence} />
         </div>

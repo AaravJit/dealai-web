@@ -22,6 +22,7 @@ export default function LoginPage() {
   const next = searchParams.get("next") || "/app";
 
   const { user, loading: authLoading, signIn, signInWithGoogle } = useAuth();
+  const busy = loading || authLoading;
 
   useEffect(() => {
     if (!authLoading && user) {
@@ -161,7 +162,7 @@ export default function LoginPage() {
                 )}
 
                 <FieldItem>
-                  <Button type="submit" disabled={loading} className="w-full">
+                  <Button type="submit" disabled={busy} className="w-full">
                     {loading ? "Signing in..." : "Sign in"}
                   </Button>
                 </FieldItem>
@@ -169,7 +170,7 @@ export default function LoginPage() {
             </form>
 
             <div className="mt-4">
-              <Button type="button" variant="secondary" className="w-full" onClick={handleGoogle} disabled={loading}>
+              <Button type="button" variant="secondary" className="w-full" onClick={handleGoogle} disabled={busy}>
                 Continue with Google
               </Button>
             </div>

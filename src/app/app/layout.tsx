@@ -15,27 +15,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    let cancelled = false;
+    if (loading) return;
 
-    async function run() {
-      setReady(false);
+    const next = pathname ?? "/app";
 
-      if (loading) return;
-
-      const next = pathname ?? "/app";
-
-      if (!user) {
-        router.replace(`/login?next=${encodeURIComponent(next)}`);
-        return;
-      }
-
-      if (!cancelled) setReady(true);
+    if (!user) {
+      router.replace(`/login?next=${encodeURIComponent(next)}`);
+      return;
     }
 
-    run();
-    return () => {
-      cancelled = true;
-    };
+    setReady(true);
   }, [user, router, pathname, loading]);
 
   if (!ready) {

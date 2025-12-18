@@ -27,6 +27,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     setSigningOut(true);
     try {
       await signOutUser();
+    } catch (error) {
+      console.error("Sign out failed", error);
     } finally {
       router.push("/login");
       setSigningOut(false);

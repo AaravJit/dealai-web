@@ -7,7 +7,7 @@ import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
   signInWithPopup,
-  signOut,
+  signOut as firebaseSignOut,
   updateProfile,
   User,
 } from "firebase/auth";
@@ -77,6 +77,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       loading,
       async signIn(email, password) {
         const cred = await signInWithEmailAndPassword(auth, email, password);
+        await ensureUserDocument(cred.user);
         return cred.user;
       },
       async signUp(email, password, displayName) {
@@ -94,7 +95,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return cred.user;
       },
       async signOut() {
-        await signOut(auth);
+        await firebaseSignOut(auth);
       },
     }),
     [loading, user]

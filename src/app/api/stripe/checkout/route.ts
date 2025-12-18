@@ -18,7 +18,7 @@ function getBaseUrl(req: Request) {
   if (host) return `${proto}://${host}`.replace(/\/+$/, "");
 
   // 4) Local fallback
-  return "http://localhost:3000";
+  return "https://dealai-flax.vercel.app/";
 }
 
 export async function POST(req: Request) {

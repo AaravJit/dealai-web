@@ -4,10 +4,10 @@ import { AppShell } from "@/components/appShell";
 import { useAuth } from "@/components/AuthProvider";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { db } from "@/lib/firebase";
-import { doc, getDoc } from "firebase/firestore";
 import { Card } from "@/components/ui";
 import { motion } from "framer-motion";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -17,13 +17,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
+    if (loading) return;
+
     let cancelled = false;
 
-    async function run() {
-      setReady(false);
-
-      if (loading) return;
-
+    const run = async () => {
       const next = pathname ?? "/app";
 
       if (!user) {
@@ -31,18 +29,25 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      const snap = await getDoc(doc(db, "users", user.uid));
-      const isPro = snap.exists() ? !!(snap.data() as any).isPro : false;
+      // Pro gate (keeps your current /purchase flow)
+      try {
+        const snap = await getDoc(doc(db, "users", user.uid));
+        const isPro = snap.exists() ? Boolean(snap.data()?.isPro) : false;
 
-      if (!isPro) {
-        router.replace(`/purchase?next=${encodeURIComponent(next)}`);
-        return;
+        if (!isPro) {
+          router.replace(`/purchase?next=${encodeURIComponent(next)}`);
+          return;
+        }
+
+        if (!cancelled) setReady(true);
+      } catch (e) {
+        console.error("Pro gate check failed:", e);
+        router.replace(`/login?next=${encodeURIComponent(next)}`);
       }
-
-      if (!cancelled) setReady(true);
-    }
+    };
 
     run();
+
     return () => {
       cancelled = true;
     };

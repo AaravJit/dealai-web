@@ -6,8 +6,6 @@ import { Container, Button } from "./ui";
 import { cn } from "./utils";
 import { Home, Upload, Sparkles, Clock, User, Settings, LogOut, ShieldCheck } from "lucide-react";
 import { useAuth } from "./AuthProvider";
-import { signOut } from "firebase/auth";
-import { auth } from "@/lib/firebase";
 import { useState } from "react";
 
 const nav = [
@@ -22,13 +20,15 @@ const nav = [
 export function AppShell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const [signingOut, setSigningOut] = useState(false);
 
   async function handleLogout() {
     setSigningOut(true);
     try {
-      await signOut(auth);
+      await signOut();
+    } catch (error) {
+      console.error("Sign out failed", error);
     } finally {
       router.push("/login");
       setSigningOut(false);
@@ -102,10 +102,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 );
               })}
             </nav>
+
             <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-3">
               <div className="text-sm font-semibold">Fast path</div>
               <div className="mt-1 text-xs text-white/60">
-                Start with <span className="text-white/80">Upload</span>, then hit <span className="text-white/80">Analyze</span>.
+                Start with <span className="text-white/80">Upload</span>, then hit{" "}
+                <span className="text-white/80">Analyze</span>.
               </div>
             </div>
           </aside>

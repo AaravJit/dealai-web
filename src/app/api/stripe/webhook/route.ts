@@ -10,6 +10,15 @@ function today(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+function normalizeSubscriptionId(
+  sub: Stripe.Invoice["subscription"] | Stripe.Checkout.Session["subscription"]
+): string | null {
+  if (!sub) return null;
+  if (typeof sub === "string") return sub;
+  // Some Stripe objects can be expanded objects with an id
+  return (sub as any)?.id ?? null;
+}
+
 export async function POST(req: Request) {
   try {
     const sig = req.headers.get("stripe-signature");
@@ -21,9 +30,7 @@ export async function POST(req: Request) {
     }
 
     const body = await req.text();
-
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {});
-
     const event = stripe.webhooks.constructEvent(body, sig, process.env.STRIPE_WEBHOOK_SECRET as string);
 
     if (event.type === "checkout.session.completed") {
@@ -31,7 +38,9 @@ export async function POST(req: Request) {
       const uid = session.client_reference_id || (session.metadata?.uid as string | undefined);
 
       if (uid) {
-        console.log("Webhook: checkout completed", { uid });
+        const subscriptionId = normalizeSubscriptionId(session.subscription);
+        console.log("Webhook: checkout completed", { uid, subscriptionId });
+
         await setDoc(
           doc(db, "users", uid),
           {
@@ -44,7 +53,7 @@ export async function POST(req: Request) {
             },
             stripe: {
               customerId: session.customer,
-              subscriptionId: session.subscription,
+              subscriptionId,
               updatedAt: serverTimestamp(),
             },
             updatedAt: serverTimestamp(),
@@ -57,8 +66,11 @@ export async function POST(req: Request) {
     if (event.type === "invoice.payment_succeeded") {
       const invoice = event.data.object as Stripe.Invoice;
       const uid = invoice.metadata?.uid as string | undefined;
+
       if (uid) {
-        console.log("Webhook: invoice succeeded", { uid });
+        const subscriptionId = normalizeSubscriptionId(invoice.subscription);
+        console.log("Webhook: invoice succeeded", { uid, subscriptionId });
+
         await setDoc(
           doc(db, "users", uid),
           {
@@ -69,7 +81,7 @@ export async function POST(req: Request) {
             },
             stripe: {
               customerId: invoice.customer,
-              subscriptionId: invoice.subscription,
+              subscriptionId,
               updatedAt: serverTimestamp(),
             },
             updatedAt: serverTimestamp(),

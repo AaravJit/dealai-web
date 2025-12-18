@@ -6,6 +6,8 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Card } from "@/components/ui";
 import { motion } from "framer-motion";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -17,14 +19,38 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (loading) return;
 
-    const next = pathname ?? "/app";
+    let cancelled = false;
 
-    if (!user) {
-      router.replace(`/login?next=${encodeURIComponent(next)}`);
-      return;
-    }
+    const run = async () => {
+      const next = pathname ?? "/app";
 
-    setReady(true);
+      if (!user) {
+        router.replace(`/login?next=${encodeURIComponent(next)}`);
+        return;
+      }
+
+      // Pro gate (keeps your current /purchase flow)
+      try {
+        const snap = await getDoc(doc(db, "users", user.uid));
+        const isPro = snap.exists() ? Boolean(snap.data()?.isPro) : false;
+
+        if (!isPro) {
+          router.replace(`/purchase?next=${encodeURIComponent(next)}`);
+          return;
+        }
+
+        if (!cancelled) setReady(true);
+      } catch (e) {
+        console.error("Pro gate check failed:", e);
+        router.replace(`/login?next=${encodeURIComponent(next)}`);
+      }
+    };
+
+    run();
+
+    return () => {
+      cancelled = true;
+    };
   }, [user, router, pathname, loading]);
 
   if (!ready) {

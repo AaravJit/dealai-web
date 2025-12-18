@@ -11,9 +11,10 @@ import {
   updateProfile,
   User,
 } from "firebase/auth";
-import { auth, db } from "@/lib/firebase";
 import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 import { motion } from "framer-motion";
+
+import { auth, db } from "@/lib/firebase";
 
 interface AuthContextValue {
   user: User | null;
@@ -51,6 +52,8 @@ async function ensureUserDocument(user: User) {
       displayName: user.displayName ?? "",
       photoURL: user.photoURL ?? "",
       createdAt: serverTimestamp(),
+      // isPro can be set later by Stripe success/webhook
+      isPro: false,
     });
   }
 }
@@ -63,10 +66,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const unsub = onAuthStateChanged(auth, async (u) => {
       setUser(u);
       setLoading(false);
-
-      if (u) {
-        await ensureUserDocument(u);
-      }
+      if (u) await ensureUserDocument(u);
     });
     return () => unsub();
   }, []);
@@ -82,9 +82,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       },
       async signUp(email, password, displayName) {
         const cred = await createUserWithEmailAndPassword(auth, email, password);
-        if (displayName) {
-          await updateProfile(cred.user, { displayName });
-        }
+        if (displayName) await updateProfile(cred.user, { displayName });
         await ensureUserDocument(cred.user);
         return cred.user;
       },
@@ -98,7 +96,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await firebaseSignOut(auth);
       },
     }),
-    [loading, user]
+    [user, loading]
   );
 
   if (loading) {

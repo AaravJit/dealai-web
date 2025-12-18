@@ -13,7 +13,7 @@ import { auth } from "@/lib/firebase";
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
@@ -22,12 +22,10 @@ export default function LoginPage() {
   const next = searchParams.get("next") || "/app";
 
   const { user, loading: authLoading, signIn, signInWithGoogle } = useAuth();
-  const busy = loading || authLoading;
+  const busy = submitting || authLoading;
 
   useEffect(() => {
-    if (!authLoading && user) {
-      router.replace(next);
-    }
+    if (!authLoading && user) router.replace(next);
   }, [authLoading, user, router, next]);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -36,29 +34,30 @@ export default function LoginPage() {
     setMessage(null);
 
     try {
-      setLoading(true);
+      setSubmitting(true);
       await signIn(email, password);
       router.replace(next);
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Authentication failed. Please try again.";
-      setErr(message);
+      const msg = error instanceof Error ? error.message : "Login failed. Please try again.";
+      setErr(msg);
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   }
 
   async function handleGoogle() {
     setErr(null);
     setMessage(null);
+
     try {
-      setLoading(true);
+      setSubmitting(true);
       await signInWithGoogle();
       router.replace(next);
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Google sign-in failed. Try another method.";
-      setErr(message);
+      const msg = error instanceof Error ? error.message : "Google sign-in failed. Try again.";
+      setErr(msg);
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   }
 
@@ -66,12 +65,12 @@ export default function LoginPage() {
     setErr(null);
     setMessage(null);
     try {
-      if (!email) throw new Error("Enter your email to reset your password.");
+      if (!email) throw new Error("Enter your email first to reset your password.");
       await sendPasswordResetEmail(auth, email);
       setMessage("Reset link sent. Check your inbox.");
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Unable to send reset email.";
-      setErr(message);
+      const msg = error instanceof Error ? error.message : "Unable to send reset email.";
+      setErr(msg);
     }
   }
 
@@ -83,12 +82,12 @@ export default function LoginPage() {
             <p className="text-sm uppercase tracking-[0.3em] text-white/50">Sign in</p>
             <h1 className="mt-3 text-4xl font-black leading-tight md:text-5xl">Welcome back</h1>
             <p className="mt-3 max-w-xl text-white/70">
-              Access your DealAI workspace to upload listings, analyze instantly, and keep everything synced across devices.
+              Sign in to access your DealAI workspace — analyze listings, keep a timeline, and stay synced.
             </p>
           </motion.div>
 
           <div className="grid max-w-xl grid-cols-2 gap-3">
-            {["Secure Firebase Auth", "Google sign-in", "Glassmorphic UI", "Responsive"].map((pill) => (
+            {["Secure Firebase Auth", "Google sign-in", "Glass UI", "Fast redirects"].map((pill) => (
               <motion.div
                 key={pill}
                 initial={{ opacity: 0, y: 8 }}
@@ -107,10 +106,12 @@ export default function LoginPage() {
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-xs uppercase tracking-[0.2em] text-white/50">DealAI</p>
-                <h2 className="text-2xl font-bold">Welcome back</h2>
-                <p className="mt-1 text-sm text-white/60">Sign in to continue.</p>
+                <h2 className="text-2xl font-bold">Sign in</h2>
+                <p className="mt-1 text-sm text-white/60">Use your email or Google.</p>
               </div>
-              <div className="rounded-full border border-cyan-300/30 bg-cyan-500/15 px-3 py-1 text-xs text-cyan-100">Secure login</div>
+              <div className="rounded-full border border-cyan-300/30 bg-cyan-500/15 px-3 py-1 text-xs text-cyan-100">
+                Secure
+              </div>
             </div>
 
             <form onSubmit={handleSubmit} className="mt-6 space-y-4">
@@ -149,7 +150,9 @@ export default function LoginPage() {
 
                 {err && (
                   <FieldItem>
-                    <div className="rounded-xl border border-rose-500/30 bg-rose-500/15 px-4 py-3 text-sm text-rose-50">{err}</div>
+                    <div className="rounded-xl border border-rose-500/30 bg-rose-500/15 px-4 py-3 text-sm text-rose-50">
+                      {err}
+                    </div>
                   </FieldItem>
                 )}
 
@@ -163,7 +166,7 @@ export default function LoginPage() {
 
                 <FieldItem>
                   <Button type="submit" disabled={busy} className="w-full">
-                    {loading ? "Signing in..." : "Sign in"}
+                    {busy ? "Signing in..." : "Sign in"}
                   </Button>
                 </FieldItem>
               </FieldStagger>
@@ -177,7 +180,7 @@ export default function LoginPage() {
 
             <div className="mt-6 flex items-center justify-between text-sm text-white/70">
               <span>
-                Need an account?{" "}
+                New here?{" "}
                 <Link className="text-cyan-200 hover:text-cyan-100" href={`/signup?next=${encodeURIComponent(next)}`}>
                   Create an account
                 </Link>

@@ -49,7 +49,6 @@ export async function POST(req: Request) {
     const cancelUrl = `${baseUrl}/purchase?next=${encodeURIComponent(safeNext)}`;
 
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-      apiVersion: "2024-06-20",
     });
 
     const session = await stripe.checkout.sessions.create({

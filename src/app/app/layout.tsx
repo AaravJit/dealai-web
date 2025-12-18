@@ -4,12 +4,11 @@ import { AppShell } from "@/components/appShell";
 import { useAuth } from "@/components/AuthProvider";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { db } from "@/lib/firebase";
-import { doc, getDoc } from "firebase/firestore";
 import { Card } from "@/components/ui";
+import { motion } from "framer-motion";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const user = useAuth();
+  const { user, loading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -21,24 +20,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     async function run() {
       setReady(false);
 
-      // Auth still loading in your provider (common pattern)
-      // If your useAuth never returns undefined, this just runs normally.
-      if (user === undefined) return;
+      if (loading) return;
 
       const next = pathname ?? "/app";
 
-      // Not signed in → go to purchase (purchase lets them sign up/sign in)
       if (!user) {
-        router.replace(`/purchase?next=${encodeURIComponent(next)}`);
-        return;
-      }
-
-      // Signed in → check paid flag
-      const snap = await getDoc(doc(db, "users", user.uid));
-      const isPro = snap.exists() ? !!(snap.data() as any).isPro : false;
-
-      if (!isPro) {
-        router.replace(`/purchase?next=${encodeURIComponent(next)}`);
+        router.replace(`/login?next=${encodeURIComponent(next)}`);
         return;
       }
 
@@ -49,17 +36,25 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [user, router, pathname]);
+  }, [user, router, pathname, loading]);
 
   if (!ready) {
     return (
-      <div className="mx-auto max-w-xl p-6">
-        <Card className="p-6">
-          <div className="text-2xl font-black tracking-tight">Checking access…</div>
-          <div className="mt-2 text-white/70 text-sm">
-            Verifying your account and subscription.
-          </div>
-        </Card>
+      <div className="flex min-h-screen items-center justify-center px-6">
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="w-full max-w-xl"
+        >
+          <Card className="glow rounded-3xl p-8">
+            <div className="h-4 w-44 rounded-full bg-white/10 animate-pulse" />
+            <div className="mt-3 h-3 w-72 rounded-full bg-white/5 animate-pulse" />
+            <div className="mt-6 grid grid-cols-2 gap-3">
+              <div className="h-10 rounded-2xl bg-white/5 animate-pulse" />
+              <div className="h-10 rounded-2xl bg-white/5 animate-pulse" />
+            </div>
+          </Card>
+        </motion.div>
       </div>
     );
   }

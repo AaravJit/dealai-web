@@ -5,23 +5,21 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AuthMotion, FieldItem, FieldStagger } from "@/components/auth/AuthMotion";
 import { Button, Card, Input } from "@/components/ui";
-import { motion } from "framer-motion";
 import { useAuth } from "@/components/AuthProvider";
-import { sendPasswordResetEmail } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { motion } from "framer-motion";
 
-export default function LoginPage() {
+export default function SignupPage() {
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   const router = useRouter();
   const searchParams = useSearchParams();
   const next = searchParams.get("next") || "/app";
 
-  const { user, loading: authLoading, signIn, signInWithGoogle } = useAuth();
+  const { user, loading: authLoading, signUp, signInWithGoogle } = useAuth();
 
   useEffect(() => {
     if (!authLoading && user) {
@@ -32,14 +30,13 @@ export default function LoginPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setErr(null);
-    setMessage(null);
 
     try {
       setLoading(true);
-      await signIn(email, password);
+      await signUp(email, password, name || undefined);
       router.replace(next);
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Authentication failed. Please try again.";
+      const message = error instanceof Error ? error.message : "Signup failed. Please try again.";
       setErr(message);
     } finally {
       setLoading(false);
@@ -48,7 +45,6 @@ export default function LoginPage() {
 
   async function handleGoogle() {
     setErr(null);
-    setMessage(null);
     try {
       setLoading(true);
       await signInWithGoogle();
@@ -61,43 +57,22 @@ export default function LoginPage() {
     }
   }
 
-  async function handleForgotPassword() {
-    setErr(null);
-    setMessage(null);
-    try {
-      if (!email) throw new Error("Enter your email to reset your password.");
-      await sendPasswordResetEmail(auth, email);
-      setMessage("Reset link sent. Check your inbox.");
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Unable to send reset email.";
-      setErr(message);
-    }
-  }
-
   return (
-    <main className="min-h-screen bg-[#05070c] text-white px-6 py-12">
+    <main className="min-h-screen bg-[#05070c] px-6 py-12 text-white">
       <div className="mx-auto grid max-w-5xl items-center gap-10 lg:grid-cols-[1.1fr_0.9fr]">
         <div className="space-y-5">
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
-            <p className="text-sm uppercase tracking-[0.3em] text-white/50">Sign in</p>
-            <h1 className="mt-3 text-4xl font-black leading-tight md:text-5xl">Welcome back</h1>
+            <p className="text-sm uppercase tracking-[0.3em] text-white/50">Get started</p>
+            <h1 className="mt-3 text-4xl font-black leading-tight md:text-5xl">Create your account</h1>
             <p className="mt-3 max-w-xl text-white/70">
-              Access your DealAI workspace to upload listings, analyze instantly, and keep everything synced across devices.
+              Spin up a DealAI workspace in seconds. You can explore the app now and upgrade anytime from the pricing page.
             </p>
           </motion.div>
 
-          <div className="grid max-w-xl grid-cols-2 gap-3">
-            {["Secure Firebase Auth", "Google sign-in", "Glassmorphic UI", "Responsive"].map((pill) => (
-              <motion.div
-                key={pill}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: 0.05 }}
-                className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/80 shadow-lg shadow-cyan-500/5"
-              >
-                {pill}
-              </motion.div>
-            ))}
+          <div className="flex flex-wrap gap-3 text-sm text-white/70">
+            <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">Email + password</span>
+            <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">Google sign-up</span>
+            <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">Upgrade later</span>
           </div>
         </div>
 
@@ -106,14 +81,24 @@ export default function LoginPage() {
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-xs uppercase tracking-[0.2em] text-white/50">DealAI</p>
-                <h2 className="text-2xl font-bold">Welcome back</h2>
-                <p className="mt-1 text-sm text-white/60">Sign in to continue.</p>
+                <h2 className="text-2xl font-bold">Create your account</h2>
+                <p className="mt-1 text-sm text-white/60">Start analyzing listings instantly.</p>
               </div>
-              <div className="rounded-full border border-cyan-300/30 bg-cyan-500/15 px-3 py-1 text-xs text-cyan-100">Secure login</div>
+              <div className="rounded-full border border-cyan-300/30 bg-cyan-500/15 px-3 py-1 text-xs text-cyan-100">Secure signup</div>
             </div>
 
             <form onSubmit={handleSubmit} className="mt-6 space-y-4">
               <FieldStagger>
+                <FieldItem>
+                  <label className="text-sm">Name</label>
+                  <Input
+                    className="mt-2"
+                    placeholder="Alex Doe"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                  />
+                </FieldItem>
+
                 <FieldItem>
                   <label className="text-sm">Email</label>
                   <Input
@@ -128,22 +113,18 @@ export default function LoginPage() {
                 </FieldItem>
 
                 <FieldItem>
-                  <div className="flex items-center justify-between text-sm">
-                    <label>Password</label>
-                    <button type="button" onClick={handleForgotPassword} className="text-cyan-200 hover:text-cyan-100">
-                      Forgot password?
-                    </button>
-                  </div>
+                  <label className="text-sm">Password</label>
                   <Input
                     className="mt-2"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     type="password"
-                    autoComplete="current-password"
+                    autoComplete="new-password"
                     required
                     minLength={6}
                     placeholder="••••••••"
                   />
+                  <p className="mt-2 text-xs text-white/50">At least 6 characters.</p>
                 </FieldItem>
 
                 {err && (
@@ -152,17 +133,9 @@ export default function LoginPage() {
                   </FieldItem>
                 )}
 
-                {message && (
-                  <FieldItem>
-                    <div className="rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-50">
-                      {message}
-                    </div>
-                  </FieldItem>
-                )}
-
                 <FieldItem>
                   <Button type="submit" disabled={loading} className="w-full">
-                    {loading ? "Signing in..." : "Sign in"}
+                    {loading ? "Creating..." : "Create account"}
                   </Button>
                 </FieldItem>
               </FieldStagger>
@@ -174,15 +147,15 @@ export default function LoginPage() {
               </Button>
             </div>
 
-            <div className="mt-6 flex items-center justify-between text-sm text-white/70">
+            <div className="mt-6 flex flex-col gap-3 text-sm text-white/70 md:flex-row md:items-center md:justify-between">
               <span>
-                Need an account?{" "}
-                <Link className="text-cyan-200 hover:text-cyan-100" href={`/signup?next=${encodeURIComponent(next)}`}>
-                  Create an account
+                Already registered?{" "}
+                <Link className="text-cyan-200 hover:text-cyan-100" href={`/login?next=${encodeURIComponent(next)}`}>
+                  Sign in
                 </Link>
               </span>
-              <Link className="text-cyan-200 hover:text-cyan-100" href="/privacy">
-                Privacy
+              <Link className="text-cyan-200 hover:text-cyan-100" href="/pricing">
+                View pricing
               </Link>
             </div>
           </Card>

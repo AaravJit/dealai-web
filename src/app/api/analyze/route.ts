@@ -7,11 +7,16 @@ const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export async function POST(req: Request) {
   try {
-    const { imageUrl, title, price, location } = await req.json();
-
     if (!process.env.OPENAI_API_KEY) {
       return NextResponse.json({ error: "Missing OPENAI_API_KEY" }, { status: 500 });
     }
+
+    const body = await req.json();
+    const imageUrl = String(body?.imageUrl ?? ""); // ✅ force string
+    const title = body?.title ?? "";
+    const price = body?.price;
+    const location = body?.location ?? "";
+
     if (!imageUrl) {
       return NextResponse.json({ error: "imageUrl is required" }, { status: 400 });
     }
@@ -28,9 +33,9 @@ Return ONLY valid JSON (no markdown) with EXACT keys:
 }
 
 Context:
-Title: ${title ?? ""}
+Title: ${title}
 Seller Price: ${typeof price === "number" ? price : ""}
-Location: ${location ?? ""}
+Location: ${location}
 
 Rules:
 - dealScore 0-100
@@ -43,16 +48,16 @@ Rules:
       model: "gpt-5.2",
       input: [
         {
-          role: "user",
+          role: "user" as const,
           content: [
-            { type: "input_text", text: prompt },
-            { type: "input_image", image_url: imageUrl },
+            { type: "input_text" as const, text: prompt },
+            { type: "input_image" as const, image_url: imageUrl },
           ],
         },
       ],
     });
 
-    const txt = (r.output_text ?? "").trim();
+    const txt = String((r as any).output_text ?? "").trim();
     const start = txt.indexOf("{");
     const end = txt.lastIndexOf("}");
 
@@ -69,7 +74,6 @@ Rules:
     const status = e?.status ?? e?.response?.status ?? 500;
     const msg = e?.message ?? String(e);
 
-    // Quota / billing / rate-limit friendly fallback
     if (status === 429) {
       return NextResponse.json(
         {
@@ -80,7 +84,7 @@ Rules:
           scamRisk: "Medium",
           notes: ["AI is temporarily unavailable (quota). Add billing/credits to enable analysis."],
         },
-        { status: 200 } // return 200 so your UI renders
+        { status: 200 }
       );
     }
 

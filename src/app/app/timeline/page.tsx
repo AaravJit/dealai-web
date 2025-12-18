@@ -8,7 +8,7 @@ import { listTimeline, type DealResult } from "@/lib/dealsDb";
 type TimelineDeal = DealResult & { id: string };
 
 export default function TimelinePage() {
-  const user = useAuth();
+  const { user } = useAuth();
   const [items, setItems] = useState<TimelineDeal[]>([]);
   const [loading, setLoading] = useState(true);
 

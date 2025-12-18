@@ -9,7 +9,7 @@ import { uploadDealImage } from "@/lib/uploadImage";
 import { ErrorCard } from "@/components/ErrorCard";
 
 export default function AnalyzePage() {
-  const user = useAuth();
+  const { user } = useAuth();
   const sp = useSearchParams();
 
   const [deal, setDeal] = useState<DealResult | null>(null);

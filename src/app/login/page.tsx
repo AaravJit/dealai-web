@@ -1,3 +1,4 @@
+// src/app/login/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -11,6 +12,8 @@ import { sendPasswordResetEmail } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 
 export default function LoginPage() {
+  const [mode, setMode] = useState<"login" | "signup">("login");
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -21,13 +24,11 @@ export default function LoginPage() {
   const searchParams = useSearchParams();
   const next = searchParams.get("next") || "/app";
 
-  const { user, loading: authLoading, signIn, signInWithGoogle } = useAuth();
+  const { user, loading: authLoading, signIn, signInWithGoogle, signUp } = useAuth() as any;
   const busy = loading || authLoading;
 
   useEffect(() => {
-    if (!authLoading && user) {
-      router.replace(next);
-    }
+    if (!authLoading && user) router.replace(next);
   }, [authLoading, user, router, next]);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -37,11 +38,18 @@ export default function LoginPage() {
 
     try {
       setLoading(true);
-      await signIn(email, password);
+
+      if (mode === "login") {
+        await signIn(email, password);
+      } else {
+        // If your AuthProvider doesn't expose signUp yet, remove this branch and force login-only.
+        await signUp(email, password, name || undefined);
+      }
+
       router.replace(next);
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Authentication failed. Please try again.";
-      setErr(message);
+      const msg = error instanceof Error ? error.message : "Authentication failed. Please try again.";
+      setErr(msg);
     } finally {
       setLoading(false);
     }
@@ -55,8 +63,8 @@ export default function LoginPage() {
       await signInWithGoogle();
       router.replace(next);
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Google sign-in failed. Try another method.";
-      setErr(message);
+      const msg = error instanceof Error ? error.message : "Google sign-in failed. Try another method.";
+      setErr(msg);
     } finally {
       setLoading(false);
     }
@@ -70,25 +78,25 @@ export default function LoginPage() {
       await sendPasswordResetEmail(auth, email);
       setMessage("Reset link sent. Check your inbox.");
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Unable to send reset email.";
-      setErr(message);
+      const msg = error instanceof Error ? error.message : "Unable to send reset email.";
+      setErr(msg);
     }
   }
 
   return (
     <main className="min-h-screen bg-[#05070c] text-white px-6 py-12">
-      <div className="mx-auto grid max-w-5xl items-center gap-10 lg:grid-cols-[1.1fr_0.9fr]">
-        <div className="space-y-5">
+      <div className="mx-auto max-w-5xl grid gap-8 lg:grid-cols-[1.1fr_0.9fr] items-center">
+        <div className="space-y-4">
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
-            <p className="text-sm uppercase tracking-[0.3em] text-white/50">Sign in</p>
-            <h1 className="mt-3 text-4xl font-black leading-tight md:text-5xl">Welcome back</h1>
-            <p className="mt-3 max-w-xl text-white/70">
-              Access your DealAI workspace to upload listings, analyze instantly, and keep everything synced across devices.
+            <p className="text-sm uppercase tracking-[0.3em] text-white/50">Access</p>
+            <h1 className="mt-3 text-4xl font-black leading-tight md:text-5xl">Welcome to DealAI</h1>
+            <p className="mt-4 max-w-xl text-white/70">
+              Sign in to upload listings, get instant analysis, and keep everything synced across devices.
             </p>
           </motion.div>
 
-          <div className="grid max-w-xl grid-cols-2 gap-3">
-            {["Secure Firebase Auth", "Google sign-in", "Glassmorphic UI", "Responsive"].map((pill) => (
+          <div className="grid grid-cols-2 gap-3 max-w-xl">
+            {["Secure Firebase Auth", "Google sign-in", "Glassmorphic UI", "Vercel-ready"].map((pill) => (
               <motion.div
                 key={pill}
                 initial={{ opacity: 0, y: 8 }}
@@ -104,17 +112,49 @@ export default function LoginPage() {
 
         <AuthMotion>
           <Card className="rounded-3xl border border-white/10 bg-white/5 p-8">
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs uppercase tracking-[0.2em] text-white/50">DealAI</p>
-                <h2 className="text-2xl font-bold">Welcome back</h2>
-                <p className="mt-1 text-sm text-white/60">Sign in to continue.</p>
+                <h2 className="text-2xl font-bold">{mode === "login" ? "Welcome back" : "Create your account"}</h2>
+                <p className="mt-1 text-sm text-white/60">
+                  {mode === "login" ? "Sign in to continue." : "Start analyzing listings instantly."}
+                </p>
               </div>
-              <div className="rounded-full border border-cyan-300/30 bg-cyan-500/15 px-3 py-1 text-xs text-cyan-100">Secure login</div>
+              <div className="rounded-full border border-cyan-300/30 bg-cyan-500/15 px-3 py-1 text-xs text-cyan-100">
+                Secure login
+              </div>
+            </div>
+
+            <div className="mt-6 grid grid-cols-2 gap-2 rounded-2xl border border-white/10 bg-white/5 p-1 text-sm">
+              <button
+                type="button"
+                onClick={() => setMode("login")}
+                className={`rounded-xl px-3 py-2 font-semibold transition ${
+                  mode === "login" ? "bg-white/90 text-slate-900 shadow" : "text-white/70 hover:text-white"
+                }`}
+              >
+                Login
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode("signup")}
+                className={`rounded-xl px-3 py-2 font-semibold transition ${
+                  mode === "signup" ? "bg-white/90 text-slate-900 shadow" : "text-white/70 hover:text-white"
+                }`}
+              >
+                Create account
+              </button>
             </div>
 
             <form onSubmit={handleSubmit} className="mt-6 space-y-4">
               <FieldStagger>
+                {mode === "signup" && (
+                  <FieldItem>
+                    <label className="text-sm">Name</label>
+                    <Input className="mt-2" placeholder="Alex Doe" value={name} onChange={(e) => setName(e.target.value)} />
+                  </FieldItem>
+                )}
+
                 <FieldItem>
                   <label className="text-sm">Email</label>
                   <Input
@@ -131,25 +171,31 @@ export default function LoginPage() {
                 <FieldItem>
                   <div className="flex items-center justify-between text-sm">
                     <label>Password</label>
-                    <button type="button" onClick={handleForgotPassword} className="text-cyan-200 hover:text-cyan-100">
-                      Forgot password?
-                    </button>
+                    {mode === "login" ? (
+                      <button type="button" onClick={handleForgotPassword} className="text-cyan-200 hover:text-cyan-100">
+                        Forgot password?
+                      </button>
+                    ) : null}
                   </div>
+
                   <Input
                     className="mt-2"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     type="password"
-                    autoComplete="current-password"
+                    autoComplete={mode === "login" ? "current-password" : "new-password"}
                     required
                     minLength={6}
                     placeholder="••••••••"
                   />
+                  <p className="mt-2 text-xs text-white/50">At least 6 characters.</p>
                 </FieldItem>
 
                 {err && (
                   <FieldItem>
-                    <div className="rounded-xl border border-rose-500/30 bg-rose-500/15 px-4 py-3 text-sm text-rose-50">{err}</div>
+                    <div className="rounded-xl border border-rose-500/30 bg-rose-500/15 px-4 py-3 text-sm text-rose-50">
+                      {err}
+                    </div>
                   </FieldItem>
                 )}
 
@@ -163,7 +209,7 @@ export default function LoginPage() {
 
                 <FieldItem>
                   <Button type="submit" disabled={busy} className="w-full">
-                    {loading ? "Signing in..." : "Sign in"}
+                    {busy ? "Working…" : mode === "login" ? "Login" : "Create account"}
                   </Button>
                 </FieldItem>
               </FieldStagger>
@@ -177,10 +223,14 @@ export default function LoginPage() {
 
             <div className="mt-6 flex items-center justify-between text-sm text-white/70">
               <span>
-                Need an account?{" "}
-                <Link className="text-cyan-200 hover:text-cyan-100" href={`/signup?next=${encodeURIComponent(next)}`}>
-                  Create an account
-                </Link>
+                {mode === "login" ? "Need an account?" : "Already registered?"}{" "}
+                <button
+                  type="button"
+                  onClick={() => setMode(mode === "login" ? "signup" : "login")}
+                  className="text-cyan-200 hover:text-cyan-100"
+                >
+                  Switch
+                </button>
               </span>
               <Link className="text-cyan-200 hover:text-cyan-100" href="/privacy">
                 Privacy

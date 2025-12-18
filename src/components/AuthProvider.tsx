@@ -1,3 +1,4 @@
+// src/components/AuthProvider.tsx
 "use client";
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
@@ -48,9 +49,10 @@ const AuthContext = createContext<AuthContextValue>({
 async function ensureUserDocument(user: User) {
   const ref = doc(db, "users", user.uid);
   const snap = await getDoc(ref);
+
   const wasPro = Boolean(snap.data()?.isPro || snap.data()?.plan === "pro");
   const basePlan = snap.exists() && wasPro ? "pro" : "free";
-  const todayValue = today();
+  const day = today();
 
   await setDoc(
     ref,
@@ -63,7 +65,7 @@ async function ensureUserDocument(user: User) {
       plan: snap.exists() ? snap.data()?.plan ?? basePlan : "free",
       isPro: wasPro,
       quota: {
-        day: snap.data()?.quota?.day ?? todayValue,
+        day: snap.data()?.quota?.day ?? day,
         uploadsUsed: snap.data()?.quota?.uploadsUsed ?? 0,
         uploadsLimit: snap.data()?.quota?.uploadsLimit ?? (wasPro ? 10000 : 3),
       },
@@ -80,6 +82,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
       setUser(u);
+
       if (u) {
         try {
           await ensureUserDocument(u);
@@ -87,8 +90,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.error("Failed to sync user document", error);
         }
       }
+
       setLoading(false);
     });
+
     return () => unsub();
   }, []);
 
@@ -103,9 +108,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       },
       async signUp(email, password, displayName) {
         const cred = await createUserWithEmailAndPassword(auth, email, password);
-        if (displayName) {
-          await updateProfile(cred.user, { displayName });
-        }
+        if (displayName) await updateProfile(cred.user, { displayName });
         await ensureUserDocument(cred.user);
         return cred.user;
       },
@@ -119,17 +122,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await firebaseSignOut(auth);
       },
     }),
-    [loading, user]
+    [user, loading]
   );
 
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#05070c] px-6 text-white">
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="glass glow w-full max-w-md rounded-3xl p-6"
-        >
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="glass glow w-full max-w-md rounded-3xl p-6">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-2xl bg-white/10 animate-pulse" />
             <div>

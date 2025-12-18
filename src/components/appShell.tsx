@@ -1,3 +1,4 @@
+// src/components/appShell.tsx
 "use client";
 
 import Link from "next/link";
@@ -7,7 +8,8 @@ import { cn } from "./utils";
 import { Home, Upload, Sparkles, Clock, User, Settings, LogOut, ShieldCheck } from "lucide-react";
 import { useAuth } from "./AuthProvider";
 import { useEffect, useMemo, useState } from "react";
-import { getUserProfile } from "@/lib/quota";
+import { db } from "@/lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
@@ -18,16 +20,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let active = true;
-    async function loadProfile() {
+    async function load() {
       if (!user) return;
       try {
-        const profile = await getUserProfile(user.uid);
-        if (active) setIsPro(Boolean(profile?.isPro));
-      } catch (error) {
-        console.error("Failed to fetch profile", error);
+        const snap = await getDoc(doc(db, "users", user.uid));
+        const pro = snap.exists() ? Boolean((snap.data() as any).isPro) : false;
+        if (active) setIsPro(pro);
+      } catch (e) {
+        console.error("Failed to load plan", e);
       }
     }
-    loadProfile();
+    load();
     return () => {
       active = false;
     };
@@ -39,7 +42,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       { href: "/app/upload", label: "Upload", icon: Upload },
       { href: "/app/analyze", label: "Analyze", icon: Sparkles },
       { href: "/app/timeline", label: "Timeline", icon: Clock },
-      ...(isPro ? [] : ([{ href: "/pricing", label: "Pricing", icon: ShieldCheck }] as const)),
+      ...(isPro ? [] : [{ href: "/pricing", label: "Pricing", icon: ShieldCheck }]),
       { href: "/app/profile", label: "Profile", icon: User },
       { href: "/app/settings", label: "Settings", icon: Settings },
     ],
@@ -119,15 +122,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       active && "border-white/10 bg-white/10 shadow-inner shadow-cyan-500/10"
                     )}
                   >
-                    <Icon
-                      size={18}
-                      className={cn("transition", active ? "text-cyan-200" : "text-white/60 group-hover:text-white")}
-                    />
+                    <Icon size={18} className={cn("transition", active ? "text-cyan-200" : "text-white/60 group-hover:text-white")} />
                     <span className={cn(active ? "text-white" : "text-white/80")}>{n.label}</span>
                   </Link>
                 );
               })}
             </nav>
+
             <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-3">
               <div className="text-sm font-semibold">Fast path</div>
               <div className="mt-1 text-xs text-white/60">

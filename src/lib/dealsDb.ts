@@ -1,68 +1,80 @@
-// src/lib/dealsDb.ts
 import { db } from "@/lib/firebase";
 import {
-  collection,
   addDoc,
-  serverTimestamp,
+  collection,
+  doc,
   getDocs,
-  query,
+  limit,
   orderBy,
+  query,
+  runTransaction,
+  serverTimestamp,
+  setDoc,
   Timestamp,
   type DocumentData,
 } from "firebase/firestore";
 
-export type DealResult = {
-  id?: string;
-
-  title: string;
-  sellerPrice: number;
-  marketValue: number;
-  counterOffer: number;
+export type DealAnalysis = {
   dealScore: number;
+  marketValue: number;
+  confidence: "low" | "medium" | "high";
+  condition: "poor" | "fair" | "good" | "excellent";
+  scamFlags: string[];
+  negotiationMessage: string;
+  reasoning: string[];
+};
 
-  condition: string; // "Excellent" | "Good" | "Fair" | "Poor" | "Unknown"
-  scamRisk: string; // "Low" | "Medium" | "High"
-  location: string;
-
-  notes: string[];
-
+export type DealDocument = {
+  id?: string;
+  title: string;
+  sellerPrice?: number;
+  location?: string;
   imageUrl?: string;
-
-  // UI-only (never store in Firestore)
-  imageDataUrl?: string;
-
+  analysis: DealAnalysis;
   createdAt?: Timestamp | null;
 };
 
-export async function saveToTimeline(
-  uid: string,
-  deal: Omit<DealResult, "id" | "imageDataUrl"> & { imageUrl?: string }
-) {
-  const ref = collection(db, "users", uid, "timeline");
-
-  // Never store base64
-  const { imageDataUrl, ...rest } = deal as DealResult & {
-    imageDataUrl?: string;
+export async function saveDeal(uid: string, deal: DealDocument): Promise<string> {
+  const col = collection(db, "users", uid, "deals");
+  const data: Omit<DealDocument, "id"> & { createdAt: Timestamp | ReturnType<typeof serverTimestamp> } = {
+    ...deal,
+    createdAt: deal.createdAt ?? serverTimestamp(),
   };
 
-  await addDoc(ref, {
-    ...rest,
-    createdAt: serverTimestamp(),
-  });
+  if (deal.id) {
+    await setDoc(doc(db, "users", uid, "deals", deal.id), data, { merge: true });
+    return deal.id;
+  }
+
+  const ref = await addDoc(col, data);
+  return ref.id;
 }
 
-export async function listTimeline(uid: string): Promise<(DealResult & { id: string })[]> {
-  const ref = collection(db, "users", uid, "timeline");
-
-  // Order newest first (requires createdAt on docs; saveToTimeline sets it)
-  const q = query(ref, orderBy("createdAt", "desc"));
-  const snap = await getDocs(q);
+export async function listDeals(uid: string, take = 50): Promise<DealDocument[]> {
+  const ref = collection(db, "users", uid, "deals");
+  const snap = await getDocs(query(ref, orderBy("createdAt", "desc"), limit(take)));
 
   return snap.docs.map((d) => {
     const data = d.data() as DocumentData;
     return {
       id: d.id,
-      ...(data as DealResult),
+      ...(data as DealDocument),
     };
+  });
+}
+
+export async function refreshDealAnalysis(uid: string, dealId: string, analysis: DealAnalysis) {
+  const ref = doc(db, "users", uid, "deals", dealId);
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists()) return;
+    tx.set(
+      ref,
+      {
+        analysis,
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true }
+    );
   });
 }

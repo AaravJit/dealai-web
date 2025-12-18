@@ -1,9 +1,10 @@
 "use client";
+/* eslint-disable @next/next/no-img-element */
 
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button, Card, Metric, Pill } from "@/components/ui";
-import { saveToTimeline, type DealResult } from "@/lib/dealsDb";
+import { saveDeal, type DealDocument } from "@/lib/dealsDb";
 import { useAuth } from "@/components/AuthProvider";
 import { uploadDealImage } from "@/lib/uploadImage";
 import { ErrorCard } from "@/components/ErrorCard";
@@ -12,15 +13,19 @@ export default function AnalyzePage() {
   const { user } = useAuth();
   const sp = useSearchParams();
 
-  const [deal, setDeal] = useState<DealResult | null>(null);
+  const [deal, setDeal] = useState<(DealDocument & { imageDataUrl?: string }) | null>(null);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [showReasoning, setShowReasoning] = useState(false);
 
-  // image comes from sessionStorage (set in upload page)
   const img = useMemo(() => {
     if (typeof window === "undefined") return undefined;
     return sessionStorage.getItem("dealai_upload_img") ?? undefined;
   }, []);
+
+  const existingImageUrl = sp.get("imageUrl") ?? undefined;
+  const existingDealId = sp.get("dealId") ?? undefined;
 
   useEffect(() => {
     let cancelled = false;
@@ -35,50 +40,60 @@ export default function AnalyzePage() {
         const price = sp.get("price") ? Number(sp.get("price")) : undefined;
         const loc = sp.get("loc") ?? undefined;
 
-        if (!img) throw new Error("Missing uploaded image. Go back and upload again.");
+        if (!img && !existingImageUrl) throw new Error("Upload a screenshot first.");
         if (!user) throw new Error("Please sign in to analyze.");
 
-        // 1) Upload screenshot (base64) to Firebase Storage => get a download URL
-        const imageUrl = await uploadDealImage(user.uid, img);
+        let imageUrl = existingImageUrl;
+        if (!imageUrl && img) {
+          imageUrl = await uploadDealImage(user.uid, img);
+        }
 
-        // 2) Call server route
         const res = await fetch("/api/analyze", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ imageUrl, title, price, location: loc }),
+          body: JSON.stringify({ imageUrl, title, sellerPrice: price, location: loc }),
         });
 
-        const data = await res.json().catch(() => ({} as any));
-        if (!res.ok) throw new Error(data?.detail ?? data?.error ?? "Analyze failed");
+        const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+        if (!res.ok)
+          throw new Error(
+            (typeof data.detail === "string" && data.detail) || (typeof data.error === "string" && data.error) || "Analyze failed"
+          );
 
-        // 3) Merge into DealResult shape (ensure required fields exist)
-        const result: DealResult = {
-          title: data.title ?? title ?? "Untitled listing",
-          sellerPrice: typeof data.sellerPrice === "number" ? data.sellerPrice : price ?? 0,
-          marketValue: typeof data.marketValue === "number" ? data.marketValue : 0,
-          counterOffer: typeof data.counterOffer === "number" ? data.counterOffer : 0,
+        const analysis = {
           dealScore: typeof data.dealScore === "number" ? data.dealScore : 50,
-          condition: data.condition ?? "Unknown",
-          scamRisk: data.scamRisk ?? "Medium",
-          notes: Array.isArray(data.notes) ? data.notes : ["No notes returned."],
+          marketValue: typeof data.marketValue === "number" ? data.marketValue : 0,
+          confidence: data.confidence ?? "medium",
+          condition: data.condition ?? "good",
+          scamFlags: Array.isArray(data.scamFlags) ? data.scamFlags.map(String) : [],
+          negotiationMessage: data.negotiationMessage ?? "Thanks for the listing. Would you consider a small discount today?",
+          reasoning: Array.isArray(data.reasoning) ? data.reasoning.map(String) : [],
+        } as DealDocument["analysis"];
+
+        const doc: DealDocument & { imageDataUrl?: string } = {
+          id: existingDealId ?? undefined,
+          title: data.title ?? title ?? "Untitled listing",
+          sellerPrice: typeof data.sellerPrice === "number" ? data.sellerPrice : price,
           location: data.location ?? loc ?? "Unknown",
           imageUrl,
-          imageDataUrl: img, // UI-only (not stored)
+          analysis,
+          imageDataUrl: img,
         };
 
-        if (!cancelled) {
-          setDeal(result);
-          setLoading(false);
+        const id = await saveDeal(user.uid, doc);
+        doc.id = id;
 
-          // clear temp image after analysis so it doesn't stick around
+        if (!cancelled) {
+          setDeal(doc);
+          setLoading(false);
           if (typeof window !== "undefined") {
             sessionStorage.removeItem("dealai_upload_img");
           }
         }
-      } catch (e: any) {
+      } catch (e: unknown) {
         console.error(e);
         if (!cancelled) {
-          setErr(e?.message ?? "Analyze failed");
+          setErr(e instanceof Error ? e.message : "Analyze failed");
           setLoading(false);
         }
       }
@@ -88,28 +103,21 @@ export default function AnalyzePage() {
     return () => {
       cancelled = true;
     };
-  }, [img, sp, user]);
+  }, [existingDealId, existingImageUrl, img, sp, user]);
 
   async function onSave() {
     if (!deal || !user) return;
 
     try {
-      let imageUrl = deal.imageUrl;
-
-      // Upload screenshot to Firebase Storage (if we have base64 but no URL)
-      if (!imageUrl && deal.imageDataUrl) {
-        imageUrl = await uploadDealImage(user.uid, deal.imageDataUrl);
-      }
-
-      // Never store base64 in Firestore
-      const { imageDataUrl, ...rest } = deal as any;
-
-      await saveToTimeline(user.uid, { ...rest, imageUrl });
-      // (Optional: swap to toast later)
-      alert("Saved to Timeline ✅");
-    } catch (e: any) {
+      setSaving(true);
+      const { imageDataUrl: _omit, ...rest } = deal;
+      void _omit;
+      await saveDeal(user.uid, rest);
+    } catch (e: unknown) {
       console.error(e);
-      setErr(e?.message ?? "Save failed");
+      setErr(e instanceof Error ? e.message : "Save failed");
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -117,9 +125,7 @@ export default function AnalyzePage() {
     return (
       <Card>
         <div className="text-2xl font-black tracking-tight">Analyzing…</div>
-        <div className="mt-2 text-white/70 text-sm">
-          Running comps, detecting red flags, generating a counter-offer.
-        </div>
+        <div className="mt-2 text-white/70 text-sm">Running comps, detecting red flags, generating a counter-offer.</div>
         <div className="mt-6 h-2 w-full overflow-hidden rounded-full bg-white/10">
           <div className="h-full w-2/3 bg-cyan-300/30 animate-pulse" />
         </div>
@@ -145,15 +151,17 @@ export default function AnalyzePage() {
   if (!deal) {
     return (
       <ErrorCard
-        title="No analysis result"
-        message="Try uploading again."
+        title="Nothing to analyze yet"
+        message="Upload a listing to start."
         href="/app/upload"
         hrefLabel="Go to Upload"
       />
     );
   }
 
-  const msg = `Hey! I'm interested. Based on similar listings, would you take $${deal.counterOffer.toLocaleString()} if I pick up today?`;
+  const reasoning = deal.analysis.reasoning.length
+    ? deal.analysis.reasoning
+    : ["We looked at price, condition, and location to score this deal."];
 
   return (
     <div className="space-y-6">
@@ -162,14 +170,17 @@ export default function AnalyzePage() {
           <div>
             <div className="text-2xl font-black tracking-tight">{deal.title}</div>
             <div className="mt-2 flex flex-wrap gap-2">
-              <Pill>Condition: {deal.condition}</Pill>
-              <Pill>Scam Risk: {deal.scamRisk}</Pill>
+              <Pill>Condition: {deal.analysis.condition}</Pill>
+              <Pill>Confidence: {deal.analysis.confidence}</Pill>
+              <Pill>Scam Flags: {deal.analysis.scamFlags.length}</Pill>
               <Pill>Location: {deal.location}</Pill>
             </div>
           </div>
 
           <div className="flex gap-2">
-            <Button onClick={onSave}>Save</Button>
+            <Button onClick={onSave} disabled={saving}>
+              {saving ? "Saving…" : "Save"}
+            </Button>
           </div>
         </div>
 
@@ -182,17 +193,17 @@ export default function AnalyzePage() {
         )}
 
         <div className="mt-5 grid gap-4 md:grid-cols-4">
-          <Metric label="Deal Score" value={`${deal.dealScore}/100`} />
-          <Metric label="Seller Price" value={`$${deal.sellerPrice.toLocaleString()}`} />
-          <Metric label="Market Value" value={`$${deal.marketValue.toLocaleString()}`} />
-          <Metric label="Counter-Offer" value={`$${deal.counterOffer.toLocaleString()}`} />
+          <Metric label="Deal Score" value={`${deal.analysis.dealScore}/100`} />
+          <Metric label="Seller Price" value={deal.sellerPrice ? `$${deal.sellerPrice.toLocaleString()}` : "Unknown"} />
+          <Metric label="Market Value" value={`$${deal.analysis.marketValue.toLocaleString()}`} />
+          <Metric label="Confidence" value={deal.analysis.confidence} />
         </div>
       </Card>
 
       <Card>
         <div className="text-sm font-semibold">AI Notes</div>
         <ul className="mt-3 space-y-2 text-sm text-white/70">
-          {deal.notes.map((n, i) => (
+          {reasoning.map((n, i) => (
             <li key={i} className="rounded-xl border border-white/10 bg-white/5 p-3">
               {n}
             </li>
@@ -201,22 +212,48 @@ export default function AnalyzePage() {
       </Card>
 
       <Card>
-        <div className="text-sm font-semibold">Copy-paste negotiation message</div>
-        <div className="mt-3 rounded-2xl border border-white/10 bg-zinc-950/40 p-4 text-sm text-white/80">
-          {msg}
-        </div>
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div className="text-sm font-semibold">Scam and negotiation</div>
+            <div className="text-xs text-white/60">Copy the message and see why this score was given.</div>
+          </div>
           <Button
             onClick={() => {
-              navigator.clipboard.writeText(msg);
-              alert("Copied ✅");
+              navigator.clipboard.writeText(deal.analysis.negotiationMessage);
             }}
           >
-            Copy
+            Copy negotiation
           </Button>
-          <Button href="/app/timeline" variant="ghost">
-            Go to Timeline →
+        </div>
+
+        <div className="mt-3 rounded-2xl border border-white/10 bg-zinc-950/40 p-4 text-sm text-white/80">
+          {deal.analysis.negotiationMessage}
+        </div>
+
+        <div className="mt-4 space-y-2">
+          <Button onClick={() => setShowReasoning((v) => !v)} variant="ghost">
+            {showReasoning ? "Hide" : "Why this score?"}
           </Button>
+          {showReasoning ? (
+            <div className="rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-white/70">
+              <div className="font-semibold text-white">Score reasoning</div>
+              <ul className="mt-2 space-y-1 list-disc list-inside">
+                {reasoning.map((r, idx) => (
+                  <li key={idx}>{r}</li>
+                ))}
+              </ul>
+              {deal.analysis.scamFlags.length ? (
+                <div className="mt-3">
+                  <div className="font-semibold text-white">Scam flags</div>
+                  <ul className="list-disc list-inside text-sm text-rose-100">
+                    {deal.analysis.scamFlags.map((flag, i) => (
+                      <li key={i}>{flag}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       </Card>
     </div>

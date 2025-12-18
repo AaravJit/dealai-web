@@ -1,3 +1,4 @@
+// src/components/appShell.tsx
 "use client";
 
 import Link from "next/link";
@@ -6,29 +7,54 @@ import { Container, Button } from "./ui";
 import { cn } from "./utils";
 import { Home, Upload, Sparkles, Clock, User, Settings, LogOut, ShieldCheck } from "lucide-react";
 import { useAuth } from "./AuthProvider";
-import { signOut } from "firebase/auth";
-import { auth } from "@/lib/firebase";
-import { useState } from "react";
-
-const nav = [
-  { href: "/app", label: "Overview", icon: Home },
-  { href: "/app/upload", label: "Upload", icon: Upload },
-  { href: "/app/analyze", label: "Analyze", icon: Sparkles },
-  { href: "/app/timeline", label: "Timeline", icon: Clock },
-  { href: "/app/profile", label: "Profile", icon: User },
-  { href: "/app/settings", label: "Settings", icon: Settings },
-];
+import { useEffect, useMemo, useState } from "react";
+import { db } from "@/lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, signOut: signOutUser } = useAuth();
   const [signingOut, setSigningOut] = useState(false);
+  const [isPro, setIsPro] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    async function load() {
+      if (!user) return;
+      try {
+        const snap = await getDoc(doc(db, "users", user.uid));
+        const pro = snap.exists() ? Boolean((snap.data() as any).isPro) : false;
+        if (active) setIsPro(pro);
+      } catch (e) {
+        console.error("Failed to load plan", e);
+      }
+    }
+    load();
+    return () => {
+      active = false;
+    };
+  }, [user]);
+
+  const nav = useMemo(
+    () => [
+      { href: "/app", label: "Overview", icon: Home },
+      { href: "/app/upload", label: "Upload", icon: Upload },
+      { href: "/app/analyze", label: "Analyze", icon: Sparkles },
+      { href: "/app/timeline", label: "Timeline", icon: Clock },
+      ...(isPro ? [] : [{ href: "/pricing", label: "Pricing", icon: ShieldCheck }]),
+      { href: "/app/profile", label: "Profile", icon: User },
+      { href: "/app/settings", label: "Settings", icon: Settings },
+    ],
+    [isPro]
+  );
 
   async function handleLogout() {
     setSigningOut(true);
     try {
-      await signOut(auth);
+      await signOutUser();
+    } catch (error) {
+      console.error("Sign out failed", error);
     } finally {
       router.push("/login");
       setSigningOut(false);
@@ -62,6 +88,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   <div className="text-sm font-semibold text-white/90">{user?.displayName || "Member"}</div>
                   <div className="text-xs text-white/60">{user?.email}</div>
                 </div>
+                <div className="rounded-full border border-white/15 bg-white/5 px-2 py-1 text-[10px] uppercase tracking-[0.2em] text-white/60">
+                  {isPro ? "Pro" : "Free"}
+                </div>
               </div>
               <Button
                 onClick={handleLogout}
@@ -93,15 +122,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       active && "border-white/10 bg-white/10 shadow-inner shadow-cyan-500/10"
                     )}
                   >
-                    <Icon
-                      size={18}
-                      className={cn("transition", active ? "text-cyan-200" : "text-white/60 group-hover:text-white")}
-                    />
+                    <Icon size={18} className={cn("transition", active ? "text-cyan-200" : "text-white/60 group-hover:text-white")} />
                     <span className={cn(active ? "text-white" : "text-white/80")}>{n.label}</span>
                   </Link>
                 );
               })}
             </nav>
+
             <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-3">
               <div className="text-sm font-semibold">Fast path</div>
               <div className="mt-1 text-xs text-white/60">

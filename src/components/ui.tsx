@@ -1,3 +1,4 @@
+import type React from "react";
 import Link from "next/link";
 import { cn } from "./utils";
 
@@ -5,8 +6,12 @@ export function Container({ children }: { children: React.ReactNode }) {
   return <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8">{children}</div>;
 }
 
-export function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <div className={cn("glass glow rounded-2xl p-5", className)}>{children}</div>;
+export function Card({ children, className = "", ...props }: React.ComponentPropsWithoutRef<"div">) {
+  return (
+    <div className={cn("glass glow rounded-2xl p-5", className)} {...props}>
+      {children}
+    </div>
+  );
 }
 
 export function Button({

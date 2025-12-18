@@ -1,3 +1,4 @@
+// src/app/login/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -5,16 +6,10 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AuthMotion, FieldItem, FieldStagger } from "@/components/auth/AuthMotion";
 import { Button, Card, Input } from "@/components/ui";
-import {
-  GoogleAuthProvider,
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  signInWithPopup,
-  updateProfile,
-} from "firebase/auth";
-import { auth } from "@/lib/firebase";
 import { motion } from "framer-motion";
 import { useAuth } from "@/components/AuthProvider";
+import { sendPasswordResetEmail } from "firebase/auth";
+import { auth } from "@/lib/firebase";
 
 export default function LoginPage() {
   const [mode, setMode] = useState<"login" | "signup">("login");
@@ -22,37 +17,39 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user, loading: authLoading } = useAuth();
-
   const next = searchParams.get("next") || "/app";
 
+  const { user, loading: authLoading, signIn, signInWithGoogle, signUp } = useAuth() as any;
+  const busy = loading || authLoading;
+
   useEffect(() => {
-    if (!authLoading && user) {
-      router.replace(next);
-    }
+    if (!authLoading && user) router.replace(next);
   }, [authLoading, user, router, next]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setErr(null);
+    setMessage(null);
 
     try {
       setLoading(true);
+
       if (mode === "login") {
-        await signInWithEmailAndPassword(auth, email, password);
+        await signIn(email, password);
       } else {
-        const cred = await createUserWithEmailAndPassword(auth, email, password);
-        if (name) {
-          await updateProfile(cred.user, { displayName: name });
-        }
+        // If your AuthProvider doesn't expose signUp yet, remove this branch and force login-only.
+        await signUp(email, password, name || undefined);
       }
+
       router.replace(next);
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Authentication failed. Please try again.";
-      setErr(message);
+      const msg = error instanceof Error ? error.message : "Authentication failed. Please try again.";
+      setErr(msg);
     } finally {
       setLoading(false);
     }
@@ -60,16 +57,29 @@ export default function LoginPage() {
 
   async function handleGoogle() {
     setErr(null);
+    setMessage(null);
     try {
       setLoading(true);
-      const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
+      await signInWithGoogle();
       router.replace(next);
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Google sign-in failed. Try another method.";
-      setErr(message);
+      const msg = error instanceof Error ? error.message : "Google sign-in failed. Try another method.";
+      setErr(msg);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleForgotPassword() {
+    setErr(null);
+    setMessage(null);
+    try {
+      if (!email) throw new Error("Enter your email to reset your password.");
+      await sendPasswordResetEmail(auth, email);
+      setMessage("Reset link sent. Check your inbox.");
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : "Unable to send reset email.";
+      setErr(msg);
     }
   }
 
@@ -79,16 +89,14 @@ export default function LoginPage() {
         <div className="space-y-4">
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
             <p className="text-sm uppercase tracking-[0.3em] text-white/50">Access</p>
-            <h1 className="mt-3 text-4xl font-black leading-tight md:text-5xl">
-              Private deal intelligence with a premium dark workspace.
-            </h1>
+            <h1 className="mt-3 text-4xl font-black leading-tight md:text-5xl">Welcome to DealAI</h1>
             <p className="mt-4 max-w-xl text-white/70">
-              Sign in to upload listings, get instant analysis, and keep everything synced across devices. Your account stays secure with Firebase Auth.
+              Sign in to upload listings, get instant analysis, and keep everything synced across devices.
             </p>
           </motion.div>
 
           <div className="grid grid-cols-2 gap-3 max-w-xl">
-            {["Glassmorphic UI", "Framer Motion", "Google Sign-in", "Secure Auth"].map((pill) => (
+            {["Secure Firebase Auth", "Google sign-in", "Glassmorphic UI", "Vercel-ready"].map((pill) => (
               <motion.div
                 key={pill}
                 initial={{ opacity: 0, y: 8 }}
@@ -143,12 +151,7 @@ export default function LoginPage() {
                 {mode === "signup" && (
                   <FieldItem>
                     <label className="text-sm">Name</label>
-                    <Input
-                      className="mt-2"
-                      placeholder="Alex Doe"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                    />
+                    <Input className="mt-2" placeholder="Alex Doe" value={name} onChange={(e) => setName(e.target.value)} />
                   </FieldItem>
                 )}
 
@@ -166,7 +169,15 @@ export default function LoginPage() {
                 </FieldItem>
 
                 <FieldItem>
-                  <label className="text-sm">Password</label>
+                  <div className="flex items-center justify-between text-sm">
+                    <label>Password</label>
+                    {mode === "login" ? (
+                      <button type="button" onClick={handleForgotPassword} className="text-cyan-200 hover:text-cyan-100">
+                        Forgot password?
+                      </button>
+                    ) : null}
+                  </div>
+
                   <Input
                     className="mt-2"
                     value={password}
@@ -188,29 +199,31 @@ export default function LoginPage() {
                   </FieldItem>
                 )}
 
+                {message && (
+                  <FieldItem>
+                    <div className="rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-50">
+                      {message}
+                    </div>
+                  </FieldItem>
+                )}
+
                 <FieldItem>
-                  <Button type="submit" disabled={loading} className="w-full">
-                    {loading ? "Working..." : mode === "login" ? "Login" : "Create account"}
+                  <Button type="submit" disabled={busy} className="w-full">
+                    {busy ? "Working…" : mode === "login" ? "Login" : "Create account"}
                   </Button>
                 </FieldItem>
               </FieldStagger>
             </form>
 
             <div className="mt-4">
-              <Button
-                type="button"
-                variant="secondary"
-                className="w-full"
-                onClick={handleGoogle}
-                disabled={loading}
-              >
+              <Button type="button" variant="secondary" className="w-full" onClick={handleGoogle} disabled={busy}>
                 Continue with Google
               </Button>
             </div>
 
             <div className="mt-6 flex items-center justify-between text-sm text-white/70">
               <span>
-                {mode === "login" ? "Need an account?" : "Already registered?"} {" "}
+                {mode === "login" ? "Need an account?" : "Already registered?"}{" "}
                 <button
                   type="button"
                   onClick={() => setMode(mode === "login" ? "signup" : "login")}

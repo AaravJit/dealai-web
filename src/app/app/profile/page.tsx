@@ -1,18 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Button, Card } from "@/components/ui";
 import { loadDB, saveDB } from "@/lib/storage";
 
 export default function ProfilePage() {
-  const [handle, setHandle] = useState("");
-  const [bio, setBio] = useState("");
-
-  useEffect(() => {
-    const db = loadDB();
-    setHandle(db.profile.handle);
-    setBio(db.profile.bio);
-  }, []);
+  const initial = loadDB();
+  const [handle, setHandle] = useState(initial.profile.handle);
+  const [bio, setBio] = useState(initial.profile.bio);
 
   function save() {
     const db = loadDB();

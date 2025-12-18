@@ -59,7 +59,8 @@ export default function PrivacyPage() {
         <section className="space-y-3">
           <h2 className="text-2xl font-bold">Contact</h2>
           <p className="text-white/80">
-            Questions? Email <span className="text-cyan-300">support@dealai.app</span>.
+            Questions? Email{" "}
+            <span className="text-cyan-300">support@dealai.app</span>.
           </p>
         </section>
       </div>

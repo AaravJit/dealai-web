@@ -1,53 +1,9 @@
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
 
+import { getBaseUrlFromRequest, getEnvBaseUrl, safeNextPath } from "@/lib/baseUrl";
+
 export const runtime = "nodejs";
-
-function cleanBase(url: string) {
-  return url.replace(/\/+$/, "");
-}
-
-export function getBaseUrl(req: Request): string {
-  let base: string | null = null;
-
-  const explicit = process.env.NEXT_PUBLIC_APP_URL?.trim();
-  if (explicit) base = cleanBase(explicit);
-
-  if (!base) {
-    const originHeader = req.headers.get("origin")?.trim();
-    if (originHeader) {
-      try {
-        const parsed = new URL(originHeader);
-        base = cleanBase(parsed.origin);
-      } catch (error) {
-        console.error("Invalid origin header for base URL", { originHeader, error });
-      }
-    }
-  }
-
-  if (!base) {
-    const proto = req.headers.get("x-forwarded-proto") ?? "https";
-    const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host");
-    if (host) base = `${proto}://${cleanBase(host)}`;
-  }
-
-  if (!base) {
-    const vercel = process.env.VERCEL_URL?.trim();
-    if (vercel) base = `https://${cleanBase(vercel)}`;
-  }
-
-  if (!base) {
-    base = "http://localhost:3000";
-  }
-
-  const isProd = process.env.VERCEL === "1" || process.env.NODE_ENV === "production";
-  if (isProd && base.includes("localhost")) {
-    console.error("Base URL resolved to localhost in production", { base });
-    throw new Error("Invalid base URL resolution in production");
-  }
-
-  return cleanBase(base);
-}
 
 export async function POST(req: Request) {
   try {
@@ -81,10 +37,34 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing priceId" }, { status: 400 });
     }
 
-    const baseUrl = getBaseUrl(req);
-    const nextPath = typeof next === "string" && next.length > 0 ? next : "/app";
-    const successUrl = `${baseUrl}/purchase/success?next=${encodeURIComponent(nextPath)}`;
-    const cancelUrl = `${baseUrl}/purchase?next=${encodeURIComponent(nextPath)}`;
+    const isProd = process.env.VERCEL === "1" || process.env.NODE_ENV === "production";
+    let baseUrl: string | null = null;
+    try {
+      baseUrl = getBaseUrlFromRequest(req);
+    } catch (error) {
+      console.warn("/api/stripe/checkout base URL from request failed", { error });
+    }
+
+    if (!baseUrl) {
+      baseUrl = getEnvBaseUrl();
+    }
+
+    if (!baseUrl) {
+      if (isProd) {
+        console.error("/api/stripe/checkout unable to resolve base URL in production");
+        return NextResponse.json({ error: "Unable to resolve base URL" }, { status: 500 });
+      }
+      baseUrl = "http://localhost:3000";
+    }
+
+    if (isProd && baseUrl.includes("localhost")) {
+      console.error("Base URL resolved to localhost in production", { baseUrl });
+      return NextResponse.json({ error: "Invalid base URL resolution in production" }, { status: 500 });
+    }
+
+    const nextPath = safeNextPath(next);
+    const successUrl = new URL(`/purchase/success?next=${encodeURIComponent(nextPath)}`, baseUrl).toString();
+    const cancelUrl = new URL(`/purchase?next=${encodeURIComponent(nextPath)}`, baseUrl).toString();
 
     console.log("/api/stripe/checkout urls", { baseUrl, successUrl, cancelUrl, uid });
 

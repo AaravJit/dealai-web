@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { db } from "@/lib/firebase";
 import { doc, serverTimestamp, setDoc } from "firebase/firestore";
+import { cleanUndefinedDeep } from "@/lib/firestoreClean";
 
 export const runtime = "nodejs";
 const PRO_LIMIT = 10000;
@@ -34,7 +35,7 @@ export async function POST(req: Request) {
         console.log("Webhook: checkout completed", { uid });
         await setDoc(
           doc(db, "users", uid),
-          {
+          cleanUndefinedDeep({
             isPro: true,
             plan: "pro",
             quota: {
@@ -48,7 +49,7 @@ export async function POST(req: Request) {
               updatedAt: serverTimestamp(),
             },
             updatedAt: serverTimestamp(),
-          },
+          }),
           { merge: true }
         );
       }
@@ -63,7 +64,7 @@ export async function POST(req: Request) {
         console.log("Webhook: invoice succeeded", { uid });
         await setDoc(
           doc(db, "users", uid),
-          {
+          cleanUndefinedDeep({
             isPro: true,
             plan: "pro",
             quota: {
@@ -75,7 +76,7 @@ export async function POST(req: Request) {
               updatedAt: serverTimestamp(),
             },
             updatedAt: serverTimestamp(),
-          },
+          }),
           { merge: true }
         );
       }

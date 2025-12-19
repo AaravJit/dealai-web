@@ -12,6 +12,7 @@ import {
   User,
 } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
+import { cleanUndefinedDeep } from "@/lib/firestoreClean";
 import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 import { motion } from "framer-motion";
 
@@ -54,7 +55,7 @@ async function ensureUserDocument(user: User) {
 
   await setDoc(
     ref,
-    {
+    cleanUndefinedDeep({
       uid: user.uid,
       email: user.email ?? "",
       displayName: user.displayName ?? "",
@@ -68,7 +69,7 @@ async function ensureUserDocument(user: User) {
         uploadsLimit: snap.data()?.quota?.uploadsLimit ?? (wasPro ? 10000 : 3),
       },
       updatedAt: serverTimestamp(),
-    },
+    }),
     { merge: true }
   );
 }

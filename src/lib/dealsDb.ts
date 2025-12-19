@@ -12,7 +12,9 @@ import {
   setDoc,
   Timestamp,
   type DocumentData,
+  updateDoc,
 } from "firebase/firestore";
+import { cleanUndefinedDeep } from "./firestoreClean";
 
 export type DealAnalysis = {
   dealScore: number;
@@ -36,10 +38,11 @@ export type DealDocument = {
 
 export async function saveDeal(uid: string, deal: DealDocument): Promise<string> {
   const col = collection(db, "users", uid, "deals");
-  const data: Omit<DealDocument, "id"> & { createdAt: Timestamp | ReturnType<typeof serverTimestamp> } = {
-    ...deal,
+  const { id: _ignoredId, ...rest } = deal;
+  const data: Omit<DealDocument, "id"> & { createdAt: Timestamp | ReturnType<typeof serverTimestamp> } = cleanUndefinedDeep({
+    ...rest,
     createdAt: deal.createdAt ?? serverTimestamp(),
-  };
+  });
 
   if (deal.id) {
     await setDoc(doc(db, "users", uid, "deals", deal.id), data, { merge: true });
@@ -47,6 +50,7 @@ export async function saveDeal(uid: string, deal: DealDocument): Promise<string>
   }
 
   const ref = await addDoc(col, data);
+  await updateDoc(ref, cleanUndefinedDeep({ id: ref.id }));
   return ref.id;
 }
 
@@ -70,10 +74,10 @@ export async function refreshDealAnalysis(uid: string, dealId: string, analysis:
     if (!snap.exists()) return;
     tx.set(
       ref,
-      {
+      cleanUndefinedDeep({
         analysis,
         updatedAt: serverTimestamp(),
-      },
+      }),
       { merge: true }
     );
   });

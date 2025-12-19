@@ -1,89 +1,204 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { AuthMotion, FieldItem, FieldStagger } from "@/components/auth/AuthMotion";
-import { Button, Card } from "@/components/ui";
-import { signInWithEmailAndPassword } from "firebase/auth";
-import { auth } from "@/lib/firebase"; // adjust if needed
+import { Button, Card, Input } from "@/components/ui";
+import { motion } from "framer-motion";
+import { useAuth } from "@/components/AuthProvider";
+import { sendPasswordResetEmail } from "firebase/auth";
+import { auth } from "@/lib/firebase";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [remember, setRemember] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
-  async function onLogin(e: React.FormEvent) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const next = searchParams.get("next") || "/app";
+
+  const { user, loading: authLoading, signIn, signInWithGoogle } = useAuth();
+  const busy = loading || authLoading;
+
+  useEffect(() => {
+    if (!authLoading && user) {
+      router.replace(next);
+    }
+  }, [authLoading, user, router, next]);
+
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setErr(null);
+    setMessage(null);
 
     try {
       setLoading(true);
-      await signInWithEmailAndPassword(auth, email, password);
-      window.location.href = "/app";
-    } catch (error: any) {
-      setErr(error?.message ?? "Failed to log in.");
+      await signIn(email, password, remember);
+      router.replace(next);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Authentication failed. Please try again.";
+      setErr(message);
     } finally {
       setLoading(false);
     }
   }
 
-  return (
-    <main className="min-h-screen bg-black text-white px-6 py-16">
-      <div className="mx-auto max-w-md">
-        <AuthMotion>
-          <Card className="rounded-3xl border border-white/10 bg-white/[0.04] backdrop-blur-xl shadow-[0_0_0_1px_rgba(255,255,255,0.03),0_20px_80px_rgba(0,0,0,0.6)] p-6">
-            <h1 className="text-3xl font-black tracking-tight">Welcome back</h1>
-            <p className="mt-2 text-white/60">Log in to continue.</p>
+  async function handleGoogle() {
+    setErr(null);
+    setMessage(null);
+    try {
+      setLoading(true);
+      await signInWithGoogle(remember);
+      router.replace(next);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Google sign-in failed. Try another method.";
+      setErr(message);
+    } finally {
+      setLoading(false);
+    }
+  }
 
-            <form onSubmit={onLogin} className="mt-6">
+  async function handleForgotPassword() {
+    setErr(null);
+    setMessage(null);
+    try {
+      if (!email) throw new Error("Enter your email to reset your password.");
+      await sendPasswordResetEmail(auth, email);
+      setMessage("Reset link sent. Check your inbox.");
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Unable to send reset email.";
+      setErr(message);
+    }
+  }
+
+  return (
+    <main className="min-h-screen bg-[#05070c] text-white px-6 py-12">
+      <div className="mx-auto grid max-w-5xl items-center gap-10 lg:grid-cols-[1.1fr_0.9fr]">
+        <div className="space-y-5">
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
+            <p className="text-sm uppercase tracking-[0.3em] text-white/50">Sign in</p>
+            <h1 className="mt-3 text-4xl font-black leading-tight md:text-5xl">Welcome back</h1>
+            <p className="mt-3 max-w-xl text-white/70">
+              Access your DealAI workspace to upload listings, analyze instantly, and keep everything synced across devices.
+            </p>
+          </motion.div>
+
+          <div className="grid max-w-xl grid-cols-2 gap-3">
+            {["Secure Firebase Auth", "Google sign-in", "Glassmorphic UI", "Responsive"].map((pill) => (
+              <motion.div
+                key={pill}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: 0.05 }}
+                className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/80 shadow-lg shadow-cyan-500/5"
+              >
+                {pill}
+              </motion.div>
+            ))}
+          </div>
+        </div>
+
+        <AuthMotion>
+          <Card className="rounded-3xl border border-white/10 bg-white/5 p-8">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs uppercase tracking-[0.2em] text-white/50">DealAI</p>
+                <h2 className="text-2xl font-bold">Welcome back</h2>
+                <p className="mt-1 text-sm text-white/60">Sign in to continue.</p>
+              </div>
+              <div className="rounded-full border border-cyan-300/30 bg-cyan-500/15 px-3 py-1 text-xs text-cyan-100">Secure login</div>
+            </div>
+
+            <form onSubmit={handleSubmit} className="mt-6 space-y-4">
               <FieldStagger>
                 <FieldItem>
-                  <label className="text-sm text-white/70">Email</label>
-                  <input
-                    className="mt-2 w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-white outline-none focus:border-cyan-300/50"
+                  <label className="text-sm">Email</label>
+                  <Input
+                    className="mt-2"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     type="email"
                     autoComplete="email"
                     required
+                    placeholder="you@example.com"
                   />
                 </FieldItem>
 
                 <FieldItem>
-                  <label className="text-sm text-white/70">Password</label>
-                  <input
-                    className="mt-2 w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-white outline-none focus:border-cyan-300/50"
+                  <div className="flex items-center justify-between text-sm">
+                    <label>Password</label>
+                    <button type="button" onClick={handleForgotPassword} className="text-cyan-200 hover:text-cyan-100">
+                      Forgot password?
+                    </button>
+                  </div>
+                  <Input
+                    className="mt-2"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     type="password"
                     autoComplete="current-password"
                     required
+                    minLength={6}
+                    placeholder="••••••••"
                   />
                 </FieldItem>
 
                 {err && (
                   <FieldItem>
-                    <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-200">
-                      {err}
+                    <div className="rounded-xl border border-rose-500/30 bg-rose-500/15 px-4 py-3 text-sm text-rose-50">{err}</div>
+                  </FieldItem>
+                )}
+
+                {message && (
+                  <FieldItem>
+                    <div className="rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-50">
+                      {message}
                     </div>
                   </FieldItem>
                 )}
 
                 <FieldItem>
-                  <Button type="submit" disabled={loading} className="w-full">
-                    {loading ? "Logging in..." : "Log in"}
-                  </Button>
+                  <label className="flex items-center gap-2 text-sm text-white/80">
+                    <input
+                      type="checkbox"
+                      checked={remember}
+                      onChange={(e) => setRemember(e.target.checked)}
+                      className="h-4 w-4 rounded border-white/20 bg-transparent text-cyan-400"
+                    />
+                    Remember me on this device
+                  </label>
+                </FieldItem>
 
-                  <div className="mt-4 text-sm text-white/60">
-                    Don&apos;t have an account?{" "}
-                    <Link className="text-cyan-300 hover:text-cyan-200" href="/register">
-                      Create one
-                    </Link>
-                  </div>
+                <FieldItem>
+                  <Button type="submit" disabled={busy} className="w-full">
+                    {loading ? "Signing in..." : "Sign in"}
+                  </Button>
                 </FieldItem>
               </FieldStagger>
             </form>
+
+            <div className="mt-4">
+              <Button type="button" variant="secondary" className="w-full" onClick={handleGoogle} disabled={busy}>
+                Continue with Google
+              </Button>
+            </div>
+
+            <div className="mt-6 flex items-center justify-between text-sm text-white/70">
+              <span>
+                Need an account?{" "}
+                <Link className="text-cyan-200 hover:text-cyan-100" href={`/signup?next=${encodeURIComponent(next)}`}>
+                  Create an account
+                </Link>
+              </span>
+              <Link className="text-cyan-200 hover:text-cyan-100" href="/privacy">
+                Privacy
+              </Link>
+            </div>
           </Card>
         </AuthMotion>
       </div>

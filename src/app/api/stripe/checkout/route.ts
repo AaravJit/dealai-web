@@ -8,17 +8,45 @@ function cleanBase(url: string) {
 }
 
 export function getBaseUrl(req: Request): string {
+  let base: string | null = null;
+
   const explicit = process.env.NEXT_PUBLIC_APP_URL?.trim();
-  if (explicit) return cleanBase(explicit);
+  if (explicit) base = cleanBase(explicit);
 
-  const vercel = process.env.VERCEL_URL?.trim();
-  if (vercel) return `https://${cleanBase(vercel)}`;
+  if (!base) {
+    const originHeader = req.headers.get("origin")?.trim();
+    if (originHeader) {
+      try {
+        const parsed = new URL(originHeader);
+        base = cleanBase(parsed.origin);
+      } catch (error) {
+        console.error("Invalid origin header for base URL", { originHeader, error });
+      }
+    }
+  }
 
-  const proto = req.headers.get("x-forwarded-proto") ?? "https";
-  const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host");
-  if (host) return `${proto}://${cleanBase(host)}`;
+  if (!base) {
+    const proto = req.headers.get("x-forwarded-proto") ?? "https";
+    const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host");
+    if (host) base = `${proto}://${cleanBase(host)}`;
+  }
 
-  return "http://localhost:3000";
+  if (!base) {
+    const vercel = process.env.VERCEL_URL?.trim();
+    if (vercel) base = `https://${cleanBase(vercel)}`;
+  }
+
+  if (!base) {
+    base = "http://localhost:3000";
+  }
+
+  const isProd = process.env.VERCEL === "1" || process.env.NODE_ENV === "production";
+  if (isProd && base.includes("localhost")) {
+    console.error("Base URL resolved to localhost in production", { base });
+    throw new Error("Invalid base URL resolution in production");
+  }
+
+  return cleanBase(base);
 }
 
 export async function POST(req: Request) {

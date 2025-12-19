@@ -28,8 +28,8 @@ export default function RegisterPage() {
       await createUserWithEmailAndPassword(auth, email, password);
       // redirect wherever your app goes next
       window.location.href = "/app";
-    } catch (error: any) {
-      setErr(error?.message ?? "Failed to create account.");
+    } catch (error: unknown) {
+      setErr(error instanceof Error ? error.message : "Failed to create account.");
     } finally {
       setLoading(false);
     }

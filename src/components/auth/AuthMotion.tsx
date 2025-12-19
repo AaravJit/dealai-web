@@ -1,13 +1,13 @@
 "use client";
 
 import { motion, useReducedMotion } from "framer-motion";
-import React from "react";
+import React, { type ComponentProps } from "react";
 
 export function AuthMotion({ children }: { children: React.ReactNode }) {
   const reduce = useReducedMotion();
 
-  const container = reduce
-    ? {}
+  const container: Partial<Pick<ComponentProps<typeof motion.div>, "initial" | "animate">> | undefined = reduce
+    ? undefined
     : {
         initial: { opacity: 0, y: 10 },
         animate: {
@@ -18,7 +18,7 @@ export function AuthMotion({ children }: { children: React.ReactNode }) {
       };
 
   return (
-    <motion.div {...(container as any)} className="w-full">
+    <motion.div {...(container ?? {})} className="w-full">
       {children}
     </motion.div>
   );

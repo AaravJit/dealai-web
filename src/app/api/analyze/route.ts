@@ -112,9 +112,11 @@ export async function POST(req: Request) {
 
     const prompt = `Return strict JSON with keys: title, sellerPrice, marketValue, dealScore (0-100), confidence (low|medium|high), condition (poor|fair|good|excellent), scamFlags (array), negotiationMessage (short), reasoning (array). Use listing hints below to stay concise.`;
 
+    const input = buildResponsesInput({ prompt, title, sellerPrice, location, imageText, imageUrl });
+
     const response = await client.responses.create({
       model: "gpt-4.1-mini",
-      input: buildResponsesInput({ prompt, title, sellerPrice, location, imageText, imageUrl }),
+      input,
     });
 
     const raw = String((response as { output_text?: string } | undefined)?.output_text ?? "").trim();

@@ -1,4 +1,3 @@
-// src/app/login/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -21,10 +20,10 @@ export default function LoginPage() {
   const [err, setErr] = useState<string | null>(null);
 
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const next = searchParams.get("next") || "/app";
+  const sp = useSearchParams();
+  const next = sp.get("next") || "/app";
 
-  const { user, loading: authLoading, signIn, signInWithGoogle, signUp } = useAuth() as any;
+  const { user, loading: authLoading, signIn, signUp, signInWithGoogle } = useAuth();
   const busy = loading || authLoading;
 
   useEffect(() => {
@@ -38,203 +37,103 @@ export default function LoginPage() {
 
     try {
       setLoading(true);
-
       if (mode === "login") {
         await signIn(email, password);
       } else {
-        // If your AuthProvider doesn't expose signUp yet, remove this branch and force login-only.
         await signUp(email, password, name || undefined);
       }
-
       router.replace(next);
-    } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : "Authentication failed. Please try again.";
-      setErr(msg);
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : "Authentication failed");
     } finally {
       setLoading(false);
     }
   }
 
   async function handleGoogle() {
-    setErr(null);
-    setMessage(null);
     try {
       setLoading(true);
       await signInWithGoogle();
       router.replace(next);
-    } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : "Google sign-in failed. Try another method.";
-      setErr(msg);
+    } catch {
+      setErr("Google sign-in failed");
     } finally {
       setLoading(false);
     }
   }
 
   async function handleForgotPassword() {
-    setErr(null);
-    setMessage(null);
     try {
-      if (!email) throw new Error("Enter your email to reset your password.");
+      if (!email) throw new Error("Enter your email first.");
       await sendPasswordResetEmail(auth, email);
-      setMessage("Reset link sent. Check your inbox.");
-    } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : "Unable to send reset email.";
-      setErr(msg);
+      setMessage("Password reset email sent.");
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : "Reset failed");
     }
   }
 
   return (
     <main className="min-h-screen bg-[#05070c] text-white px-6 py-12">
       <div className="mx-auto max-w-5xl grid gap-8 lg:grid-cols-[1.1fr_0.9fr] items-center">
-        <div className="space-y-4">
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
-            <p className="text-sm uppercase tracking-[0.3em] text-white/50">Access</p>
-            <h1 className="mt-3 text-4xl font-black leading-tight md:text-5xl">Welcome to DealAI</h1>
-            <p className="mt-4 max-w-xl text-white/70">
-              Sign in to upload listings, get instant analysis, and keep everything synced across devices.
-            </p>
-          </motion.div>
-
-          <div className="grid grid-cols-2 gap-3 max-w-xl">
-            {["Secure Firebase Auth", "Google sign-in", "Glassmorphic UI", "Vercel-ready"].map((pill) => (
-              <motion.div
-                key={pill}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: 0.05 }}
-                className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/80 shadow-lg shadow-cyan-500/5"
-              >
-                {pill}
-              </motion.div>
-            ))}
-          </div>
-        </div>
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+          <h1 className="text-5xl font-black">DealAI</h1>
+          <p className="mt-3 text-white/70">
+            Sign in to analyze listings and save deals.
+          </p>
+        </motion.div>
 
         <AuthMotion>
-          <Card className="rounded-3xl border border-white/10 bg-white/5 p-8">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-[0.2em] text-white/50">DealAI</p>
-                <h2 className="text-2xl font-bold">{mode === "login" ? "Welcome back" : "Create your account"}</h2>
-                <p className="mt-1 text-sm text-white/60">
-                  {mode === "login" ? "Sign in to continue." : "Start analyzing listings instantly."}
-                </p>
-              </div>
-              <div className="rounded-full border border-cyan-300/30 bg-cyan-500/15 px-3 py-1 text-xs text-cyan-100">
-                Secure login
-              </div>
-            </div>
-
-            <div className="mt-6 grid grid-cols-2 gap-2 rounded-2xl border border-white/10 bg-white/5 p-1 text-sm">
-              <button
-                type="button"
-                onClick={() => setMode("login")}
-                className={`rounded-xl px-3 py-2 font-semibold transition ${
-                  mode === "login" ? "bg-white/90 text-slate-900 shadow" : "text-white/70 hover:text-white"
-                }`}
-              >
-                Login
-              </button>
-              <button
-                type="button"
-                onClick={() => setMode("signup")}
-                className={`rounded-xl px-3 py-2 font-semibold transition ${
-                  mode === "signup" ? "bg-white/90 text-slate-900 shadow" : "text-white/70 hover:text-white"
-                }`}
-              >
-                Create account
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+          <Card className="p-8 rounded-3xl">
+            <form onSubmit={handleSubmit} className="space-y-4">
               <FieldStagger>
                 {mode === "signup" && (
                   <FieldItem>
-                    <label className="text-sm">Name</label>
-                    <Input className="mt-2" placeholder="Alex Doe" value={name} onChange={(e) => setName(e.target.value)} />
+                    <Input
+                      placeholder="Name"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                    />
                   </FieldItem>
                 )}
 
                 <FieldItem>
-                  <label className="text-sm">Email</label>
                   <Input
-                    className="mt-2"
+                    type="email"
+                    placeholder="Email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    type="email"
-                    autoComplete="email"
                     required
-                    placeholder="you@example.com"
                   />
                 </FieldItem>
 
                 <FieldItem>
-                  <div className="flex items-center justify-between text-sm">
-                    <label>Password</label>
-                    {mode === "login" ? (
-                      <button type="button" onClick={handleForgotPassword} className="text-cyan-200 hover:text-cyan-100">
-                        Forgot password?
-                      </button>
-                    ) : null}
-                  </div>
-
                   <Input
-                    className="mt-2"
+                    type="password"
+                    placeholder="Password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    type="password"
-                    autoComplete={mode === "login" ? "current-password" : "new-password"}
                     required
-                    minLength={6}
-                    placeholder="••••••••"
                   />
-                  <p className="mt-2 text-xs text-white/50">At least 6 characters.</p>
                 </FieldItem>
 
-                {err && (
-                  <FieldItem>
-                    <div className="rounded-xl border border-rose-500/30 bg-rose-500/15 px-4 py-3 text-sm text-rose-50">
-                      {err}
-                    </div>
-                  </FieldItem>
-                )}
+                {err && <div className="text-rose-400 text-sm">{err}</div>}
+                {message && <div className="text-emerald-400 text-sm">{message}</div>}
 
-                {message && (
-                  <FieldItem>
-                    <div className="rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-50">
-                      {message}
-                    </div>
-                  </FieldItem>
-                )}
-
-                <FieldItem>
-                  <Button type="submit" disabled={busy} className="w-full">
-                    {busy ? "Working…" : mode === "login" ? "Login" : "Create account"}
-                  </Button>
-                </FieldItem>
+                <Button type="submit" disabled={busy}>
+                  {busy ? "Working…" : mode === "login" ? "Login" : "Create account"}
+                </Button>
               </FieldStagger>
             </form>
 
-            <div className="mt-4">
-              <Button type="button" variant="secondary" className="w-full" onClick={handleGoogle} disabled={busy}>
-                Continue with Google
-              </Button>
-            </div>
+            <Button variant="secondary" onClick={handleGoogle} className="mt-4 w-full">
+              Continue with Google
+            </Button>
 
-            <div className="mt-6 flex items-center justify-between text-sm text-white/70">
-              <span>
-                {mode === "login" ? "Need an account?" : "Already registered?"}{" "}
-                <button
-                  type="button"
-                  onClick={() => setMode(mode === "login" ? "signup" : "login")}
-                  className="text-cyan-200 hover:text-cyan-100"
-                >
-                  Switch
-                </button>
-              </span>
-              <Link className="text-cyan-200 hover:text-cyan-100" href="/privacy">
-                Privacy
-              </Link>
+            <div className="mt-4 flex justify-between text-sm">
+              <button onClick={() => setMode(mode === "login" ? "signup" : "login")}>
+                {mode === "login" ? "Create account" : "Back to login"}
+              </button>
+              <button onClick={handleForgotPassword}>Forgot password?</button>
             </div>
           </Card>
         </AuthMotion>

@@ -1,4 +1,3 @@
-// src/app/app/timeline/page.tsx
 "use client";
 /* eslint-disable @next/next/no-img-element */
 
@@ -23,7 +22,6 @@ export default function TimelinePage() {
       const data = await listDeals(user.uid);
       setItems(data);
     } catch (err: unknown) {
-      console.error(err);
       setError(err instanceof Error ? err.message : "Failed to load timeline");
     } finally {
       setLoading(false);
@@ -51,12 +49,9 @@ export default function TimelinePage() {
       });
 
       const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-
       if (!res.ok) {
         throw new Error(
-          (typeof data.detail === "string" && data.detail) ||
-            (typeof data.error === "string" && data.error) ||
-            "Re-analyze failed"
+          (typeof data.error === "string" && data.error) || "Re-analyze failed"
         );
       }
 
@@ -67,14 +62,15 @@ export default function TimelinePage() {
         condition: (data.condition as any) ?? "good",
         scamFlags: Array.isArray(data.scamFlags) ? data.scamFlags.map(String) : [],
         negotiationMessage:
-          typeof data.negotiationMessage === "string" ? data.negotiationMessage : "Updated negotiation guidance ready.",
+          typeof data.negotiationMessage === "string"
+            ? data.negotiationMessage
+            : "Updated negotiation guidance ready.",
         reasoning: Array.isArray(data.reasoning) ? data.reasoning.map(String) : [],
       };
 
       await refreshDealAnalysis(user.uid, deal.id, analysis);
       await refresh();
     } catch (err: unknown) {
-      console.error(err);
       setError(err instanceof Error ? err.message : "Re-analyze failed");
     } finally {
       setReAnalyzing(null);
@@ -82,7 +78,6 @@ export default function TimelinePage() {
   }
 
   if (!user) return <Card>Please log in to view your timeline.</Card>;
-
   if (loading) return <Card>Loading timeline…</Card>;
 
   if (error) {
@@ -115,31 +110,31 @@ export default function TimelinePage() {
             <div className="text-2xl font-black">Timeline</div>
             <div className="text-sm text-white/70">Your saved deals</div>
           </div>
-          <div className="flex gap-2">
-            <Button onClick={refresh} variant="secondary">
-              Refresh
-            </Button>
-          </div>
+          <Button onClick={refresh} variant="secondary">
+            Refresh
+          </Button>
         </div>
       </Card>
 
       <div className="grid gap-4 md:grid-cols-2">
         {items.map((d) => (
           <Card key={d.id} className="overflow-hidden p-0">
-            {d.imageUrl && <img src={d.imageUrl} alt="" className="h-48 w-full object-cover" />}
+            {d.imageUrl && (
+              <img src={d.imageUrl} alt="" className="h-48 w-full object-cover" />
+            )}
 
             <div className="space-y-2 p-5">
               <div className="font-black">{d.title || "Untitled listing"}</div>
 
               <div className="mt-2 flex flex-wrap gap-2">
-                <Pill>Score {d.analysis?.dealScore ?? 0}</Pill>
-                {d.sellerPrice ? <Pill>${d.sellerPrice.toLocaleString()}</Pill> : null}
-                <Pill>MV ${(d.analysis?.marketValue ?? 0).toLocaleString()}</Pill>
+                <Pill>Score {d.analysis.dealScore}</Pill>
+                {d.sellerPrice && <Pill>${d.sellerPrice.toLocaleString()}</Pill>}
+                <Pill>MV ${d.analysis.marketValue.toLocaleString()}</Pill>
               </div>
 
-              {d.analysis?.negotiationMessage ? (
-                <div className="text-xs text-white/60">{d.analysis.negotiationMessage}</div>
-              ) : null}
+              <div className="text-xs text-white/60">
+                {d.analysis.negotiationMessage}
+              </div>
 
               <Button
                 onClick={() => handleReanalyze(d)}

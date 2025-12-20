@@ -1,4 +1,3 @@
-// src/components/AuthProvider.tsx
 "use client";
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
@@ -14,11 +13,6 @@ import {
 } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
 import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
-import { motion } from "framer-motion";
-
-function today(): string {
-  return new Date().toISOString().slice(0, 10);
-}
 
 interface AuthContextValue {
   user: User | null;
@@ -29,46 +23,20 @@ interface AuthContextValue {
   signOut: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextValue>({
-  user: null,
-  loading: true,
-  signIn: async () => {
-    throw new Error("AuthProvider not ready");
-  },
-  signUp: async () => {
-    throw new Error("AuthProvider not ready");
-  },
-  signInWithGoogle: async () => {
-    throw new Error("AuthProvider not ready");
-  },
-  signOut: async () => {
-    throw new Error("AuthProvider not ready");
-  },
-});
+const AuthContext = createContext<AuthContextValue>(null as any);
 
 async function ensureUserDocument(user: User) {
   const ref = doc(db, "users", user.uid);
   const snap = await getDoc(ref);
 
-  const wasPro = Boolean(snap.data()?.isPro || snap.data()?.plan === "pro");
-  const basePlan = snap.exists() && wasPro ? "pro" : "free";
-  const day = today();
-
   await setDoc(
     ref,
     {
       uid: user.uid,
-      email: user.email ?? "",
-      displayName: user.displayName ?? "",
-      photoURL: user.photoURL ?? "",
-      createdAt: snap.exists() ? snap.data()?.createdAt ?? serverTimestamp() : serverTimestamp(),
-      plan: snap.exists() ? snap.data()?.plan ?? basePlan : "free",
-      isPro: wasPro,
-      quota: {
-        day: snap.data()?.quota?.day ?? day,
-        uploadsUsed: snap.data()?.quota?.uploadsUsed ?? 0,
-        uploadsLimit: snap.data()?.quota?.uploadsLimit ?? (wasPro ? 10000 : 3),
-      },
+      email: user.email,
+      displayName: user.displayName,
+      plan: snap.data()?.plan ?? "free",
+      isPro: snap.data()?.isPro ?? false,
       updatedAt: serverTimestamp(),
     },
     { merge: true }
@@ -82,18 +50,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
       setUser(u);
-
-      if (u) {
-        try {
-          await ensureUserDocument(u);
-        } catch (error) {
-          console.error("Failed to sync user document", error);
-        }
-      }
-
+      if (u) await ensureUserDocument(u);
       setLoading(false);
     });
-
     return () => unsub();
   }, []);
 
@@ -113,8 +72,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return cred.user;
       },
       async signInWithGoogle() {
-        const provider = new GoogleAuthProvider();
-        const cred = await signInWithPopup(auth, provider);
+        const cred = await signInWithPopup(auth, new GoogleAuthProvider());
         await ensureUserDocument(cred.user);
         return cred.user;
       },
@@ -124,27 +82,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }),
     [user, loading]
   );
-
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-[#05070c] px-6 text-white">
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="glass glow w-full max-w-md rounded-3xl p-6">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-2xl bg-white/10 animate-pulse" />
-            <div>
-              <div className="h-4 w-40 rounded-full bg-white/10 animate-pulse" />
-              <div className="mt-2 h-3 w-28 rounded-full bg-white/5 animate-pulse" />
-            </div>
-          </div>
-          <div className="mt-6 space-y-3">
-            <div className="h-10 rounded-2xl bg-white/5 animate-pulse" />
-            <div className="h-10 rounded-2xl bg-white/5 animate-pulse" />
-            <div className="h-10 rounded-2xl bg-white/5 animate-pulse" />
-          </div>
-        </motion.div>
-      </div>
-    );
-  }
 
   return <AuthContext.Provider value={api}>{children}</AuthContext.Provider>;
 }

@@ -1,4 +1,3 @@
-// src/app/app/layout.tsx
 "use client";
 
 import { AppShell } from "@/components/appShell";
@@ -20,7 +19,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     let cancelled = false;
 
     async function run() {
-      setReady(false);
       if (loading) return;
 
       const next = pathname ?? "/app";
@@ -30,7 +28,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      // Pro gate (expects users/{uid}.isPro boolean)
       const snap = await getDoc(doc(db, "users", user.uid));
       const isPro = snap.exists() ? Boolean((snap.data() as any).isPro) : false;
 
@@ -50,16 +47,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   if (!ready) {
     return (
-      <div className="flex min-h-screen items-center justify-center px-6">
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-xl">
-          <Card className="glow rounded-3xl p-8">
-            <div className="h-4 w-44 rounded-full bg-white/10 animate-pulse" />
-            <div className="mt-3 h-3 w-72 rounded-full bg-white/5 animate-pulse" />
-            <div className="mt-6 grid grid-cols-2 gap-3">
-              <div className="h-10 rounded-2xl bg-white/5 animate-pulse" />
-              <div className="h-10 rounded-2xl bg-white/5 animate-pulse" />
-            </div>
-          </Card>
+      <div className="flex min-h-screen items-center justify-center">
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+          <Card className="p-6">Loading…</Card>
         </motion.div>
       </div>
     );

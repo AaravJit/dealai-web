@@ -22,7 +22,6 @@ export default function TimelinePage() {
       const data = await listDeals(user.uid);
       setItems(data);
     } catch (err: unknown) {
-      console.error(err);
       setError(err instanceof Error ? err.message : "Failed to load timeline");
     } finally {
       setLoading(false);
@@ -36,6 +35,7 @@ export default function TimelinePage() {
   async function handleReanalyze(deal: DealDocument) {
     if (!user || !deal.id) return;
     setReAnalyzing(deal.id);
+
     try {
       const res = await fetch("/api/analyze", {
         method: "POST",
@@ -47,50 +47,38 @@ export default function TimelinePage() {
           imageUrl: deal.imageUrl,
         }),
       });
-      const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-      if (!res.ok)
-        throw new Error(
-          (typeof data.detail === "string" && data.detail) || (typeof data.error === "string" && data.error) || "Re-analyze failed"
-        );
 
-      const confidence =
-        typeof data.confidence === "string" && ["low", "medium", "high"].includes(data.confidence)
-          ? (data.confidence as DealDocument["analysis"]["confidence"])
-          : "medium";
-      const condition =
-        typeof data.condition === "string" && ["poor", "fair", "good", "excellent"].includes(data.condition)
-          ? (data.condition as DealDocument["analysis"]["condition"])
-          : "good";
+      const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+      if (!res.ok) {
+        throw new Error(
+          (typeof data.error === "string" && data.error) || "Re-analyze failed"
+        );
+      }
 
       const analysis: DealDocument["analysis"] = {
         dealScore: typeof data.dealScore === "number" ? data.dealScore : 50,
         marketValue: typeof data.marketValue === "number" ? data.marketValue : 0,
-        confidence,
-        condition,
+        confidence: (data.confidence as any) ?? "medium",
+        condition: (data.condition as any) ?? "good",
         scamFlags: Array.isArray(data.scamFlags) ? data.scamFlags.map(String) : [],
         negotiationMessage:
-          (typeof data.negotiationMessage === "string" ? data.negotiationMessage : undefined) ||
-          "Updated negotiation guidance ready.",
+          typeof data.negotiationMessage === "string"
+            ? data.negotiationMessage
+            : "Updated negotiation guidance ready.",
         reasoning: Array.isArray(data.reasoning) ? data.reasoning.map(String) : [],
       };
 
       await refreshDealAnalysis(user.uid, deal.id, analysis);
       await refresh();
     } catch (err: unknown) {
-      console.error(err);
       setError(err instanceof Error ? err.message : "Re-analyze failed");
     } finally {
       setReAnalyzing(null);
     }
   }
 
-  if (!user) {
-    return <Card>Please log in to view your timeline.</Card>;
-  }
-
-  if (loading) {
-    return <Card>Loading timeline…</Card>;
-  }
+  if (!user) return <Card>Please log in to view your timeline.</Card>;
+  if (loading) return <Card>Loading timeline…</Card>;
 
   if (error) {
     return (
@@ -122,35 +110,31 @@ export default function TimelinePage() {
             <div className="text-2xl font-black">Timeline</div>
             <div className="text-sm text-white/70">Your saved deals</div>
           </div>
-          <div className="flex gap-2">
-            <Button onClick={refresh} variant="secondary">
-              Refresh
-            </Button>
-          </div>
+          <Button onClick={refresh} variant="secondary">
+            Refresh
+          </Button>
         </div>
       </Card>
 
       <div className="grid gap-4 md:grid-cols-2">
         {items.map((d) => (
-          <Card key={d.id} className="p-0 overflow-hidden">
+          <Card key={d.id} className="overflow-hidden p-0">
             {d.imageUrl && (
-              <img
-                src={d.imageUrl}
-                alt=""
-                className="h-48 w-full object-cover"
-              />
+              <img src={d.imageUrl} alt="" className="h-48 w-full object-cover" />
             )}
 
-            <div className="p-5 space-y-2">
-              <div className="font-black">{d.title}</div>
+            <div className="space-y-2 p-5">
+              <div className="font-black">{d.title || "Untitled listing"}</div>
 
-              <div className="mt-2 flex gap-2 flex-wrap">
+              <div className="mt-2 flex flex-wrap gap-2">
                 <Pill>Score {d.analysis.dealScore}</Pill>
-                {d.sellerPrice ? <Pill>${d.sellerPrice.toLocaleString()}</Pill> : null}
+                {d.sellerPrice && <Pill>${d.sellerPrice.toLocaleString()}</Pill>}
                 <Pill>MV ${d.analysis.marketValue.toLocaleString()}</Pill>
               </div>
 
-              <div className="text-xs text-white/60">{d.analysis.negotiationMessage}</div>
+              <div className="text-xs text-white/60">
+                {d.analysis.negotiationMessage}
+              </div>
 
               <Button
                 onClick={() => handleReanalyze(d)}

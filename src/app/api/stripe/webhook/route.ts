@@ -11,28 +11,48 @@ function today(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+function normalizeSubscriptionId(sub: unknown): string | null {
+  if (!sub) return null;
+  if (typeof sub === "string") return sub;
+  if (typeof sub === "object" && sub !== null && "id" in sub) {
+    return String((sub as any).id);
+  }
+  return null;
+}
+
 export async function POST(req: Request) {
   try {
     const sig = req.headers.get("stripe-signature");
-    if (!sig) return NextResponse.json({ error: "Missing stripe-signature" }, { status: 400 });
+    if (!sig) {
+      return NextResponse.json({ error: "Missing stripe-signature" }, { status: 400 });
+    }
 
-    if (!process.env.STRIPE_WEBHOOK_SECRET || !process.env.STRIPE_SECRET_KEY) {
-      console.error("Missing Stripe secrets for webhook");
+    if (!process.env.STRIPE_SECRET_KEY || !process.env.STRIPE_WEBHOOK_SECRET) {
       return NextResponse.json({ error: "Stripe not configured" }, { status: 500 });
     }
 
     const body = await req.text();
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
-    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {});
-
-    const event = stripe.webhooks.constructEvent(body, sig, process.env.STRIPE_WEBHOOK_SECRET as string);
+    const event = stripe.webhooks.constructEvent(
+      body,
+      sig,
+      process.env.STRIPE_WEBHOOK_SECRET
+    );
 
     if (event.type === "checkout.session.completed") {
       const session = event.data.object as Stripe.Checkout.Session;
-      const uid = session.client_reference_id || (session.metadata?.uid as string | undefined);
+      const uid =
+        session.client_reference_id ||
+        (session.metadata?.uid as string | undefined);
 
       if (uid) {
-        console.log("Webhook: checkout completed", { uid });
+        const subscriptionId = normalizeSubscriptionId((session as any).subscription);
+        const customerId =
+          typeof session.customer === "string"
+            ? session.customer
+            : (session.customer as any)?.id ?? null;
+
         await setDoc(
           doc(db, "users", uid),
           stripUndefinedDeep({
@@ -44,8 +64,8 @@ export async function POST(req: Request) {
               uploadsLimit: PRO_LIMIT,
             },
             stripe: {
-              customerId: session.customer,
-              subscriptionId: session.subscription,
+              customerId,
+              subscriptionId,
               updatedAt: serverTimestamp(),
             },
             updatedAt: serverTimestamp(),
@@ -58,20 +78,22 @@ export async function POST(req: Request) {
     if (event.type === "invoice.payment_succeeded") {
       const invoice = event.data.object as Stripe.Invoice;
       const uid = invoice.metadata?.uid as string | undefined;
-      const subscriptionId =
-        (invoice as Stripe.Invoice & { subscription?: string | Stripe.Subscription | null }).subscription || undefined;
+
       if (uid) {
-        console.log("Webhook: invoice succeeded", { uid });
+        const subscriptionId = normalizeSubscriptionId((invoice as any).subscription);
+        const customerId =
+          typeof invoice.customer === "string"
+            ? invoice.customer
+            : (invoice.customer as any)?.id ?? null;
+
         await setDoc(
           doc(db, "users", uid),
           stripUndefinedDeep({
             isPro: true,
             plan: "pro",
-            quota: {
-              uploadsLimit: PRO_LIMIT,
-            },
+            quota: { uploadsLimit: PRO_LIMIT },
             stripe: {
-              customerId: invoice.customer,
+              customerId,
               subscriptionId,
               updatedAt: serverTimestamp(),
             },
@@ -83,9 +105,8 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ received: true });
-  } catch (e: unknown) {
-    console.error("Webhook error:", e);
-    const detail = e instanceof Error ? e.message : String(e);
+  } catch (err: unknown) {
+    const detail = err instanceof Error ? err.message : String(err);
     return NextResponse.json({ error: detail }, { status: 400 });
   }
 }

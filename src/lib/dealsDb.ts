@@ -10,9 +10,9 @@ import {
   runTransaction,
   serverTimestamp,
   setDoc,
-  Timestamp,
   type DocumentData,
-  updateDoc,
+  type FieldValue,
+  type Timestamp,
 } from "firebase/firestore";
 import { stripUndefinedDeep } from "./firestoreClean";
 
@@ -33,24 +33,13 @@ export type DealDocument = {
   location?: string;
   imageUrl?: string;
   analysis: DealAnalysis;
-  createdAt?: Timestamp | ReturnType<typeof serverTimestamp> | null;
+  createdAt?: Timestamp | FieldValue | null;
 };
 
-function sanitizeImageUrl(url?: string) {
-  if (!url) return undefined;
-  if (typeof url === "string" && url.startsWith("data:image")) {
-    console.warn("Stripping data URL before Firestore write");
-    return undefined;
-  }
-  return url;
-}
-
-export async function saveDeal(uid: string, deal: DealDocument & { imageDataUrl?: string }): Promise<string> {
+export async function saveDeal(uid: string, deal: DealDocument): Promise<string> {
   const col = collection(db, "users", uid, "deals");
-  const { id: _ignoredId, imageUrl: rawImageUrl, imageDataUrl: _ignoredImageDataUrl, ...rest } = deal;
-  const data: Omit<DealDocument, "id"> & { createdAt: Timestamp | ReturnType<typeof serverTimestamp> } = stripUndefinedDeep({
-    ...rest,
-    imageUrl: sanitizeImageUrl(rawImageUrl),
+  const data = stripUndefinedDeep({
+    ...deal,
     createdAt: deal.createdAt ?? serverTimestamp(),
   });
 
@@ -60,7 +49,6 @@ export async function saveDeal(uid: string, deal: DealDocument & { imageDataUrl?
   }
 
   const ref = await addDoc(col, data);
-  await updateDoc(ref, stripUndefinedDeep({ id: ref.id }));
   return ref.id;
 }
 
@@ -68,27 +56,13 @@ export async function listDeals(uid: string, take = 50): Promise<DealDocument[]>
   const ref = collection(db, "users", uid, "deals");
   const snap = await getDocs(query(ref, orderBy("createdAt", "desc"), limit(take)));
 
-  return snap.docs.map((d) => {
-    const data = d.data() as DocumentData;
-    return {
-      id: d.id,
-      ...(data as DealDocument),
-    };
-  });
+  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as DocumentData) }));
 }
 
 export async function refreshDealAnalysis(uid: string, dealId: string, analysis: DealAnalysis) {
   const ref = doc(db, "users", uid, "deals", dealId);
   await runTransaction(db, async (tx) => {
-    const snap = await tx.get(ref);
-    if (!snap.exists()) return;
-    tx.set(
-      ref,
-      stripUndefinedDeep({
-        analysis,
-        updatedAt: serverTimestamp(),
-      }),
-      { merge: true }
-    );
+    if (!(await tx.get(ref)).exists()) return;
+    tx.set(ref, { analysis, updatedAt: serverTimestamp() }, { merge: true });
   });
 }

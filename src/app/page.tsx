@@ -28,7 +28,7 @@ function GlassCard({
 
 export default function HomePage() {
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#05070A] text-white">
+    <main className="relative min-h-screen overflow-hidden bg-black text-white">
       {/* Space / liquid background */}
       <div className="pointer-events-none absolute inset-0 -z-10">
         {/* subtle star-ish noise effect (fake via gradients) */}
@@ -41,86 +41,81 @@ export default function HomePage() {
 
       {/* HERO */}
       <section className="mx-auto max-w-6xl px-6 pt-16 pb-10">
-        <Reveal>
-          <div className="inline-flex flex-wrap gap-2">
-            <Pill>Screenshot → Insights</Pill>
-            <Pill>Deal score</Pill>
-            <Pill>Scam flags</Pill>
-            <Pill>Counter-offer</Pill>
+        <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
+          <div>
+            <Reveal>
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-sm font-semibold">
+                <span className="text-white">Deal</span>
+                <span className="text-cyan-200">AI</span>
+              </div>
+            </Reveal>
+
+            <Reveal delay={0.08}>
+              <h1 className="mt-5 text-balance text-5xl font-black leading-tight tracking-tight md:text-6xl">
+                Confident offers for every marketplace deal.
+              </h1>
+            </Reveal>
+
+            <Reveal delay={0.14}>
+              <p className="mt-4 max-w-2xl text-lg text-white/70">
+                Deal AI reads your listing screenshots, scores the offer, flags scams, and drafts a negotiation message you can send immediately.
+              </p>
+            </Reveal>
+
+            <Reveal delay={0.2}>
+              <div className="mt-6 flex flex-wrap gap-2 text-sm text-white/60">
+                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">Secure Firebase auth</span>
+                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">Stripe-protected checkout</span>
+                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">We never store card details</span>
+              </div>
+            </Reveal>
+
+            <Reveal delay={0.26}>
+              <div className="mt-8 flex flex-wrap gap-3">
+                <Button href="/app/upload">Try Deal AI</Button>
+                <Button href="/pricing" variant="ghost">
+                  See pricing →
+                </Button>
+              </div>
+            </Reveal>
+
+            <Reveal delay={0.32}>
+              <div className="mt-10 grid max-w-2xl grid-cols-2 gap-3 text-sm text-white/80 md:grid-cols-3">
+                <Pill>Deal score</Pill>
+                <Pill>Scam flags</Pill>
+                <Pill>Copy negotiation</Pill>
+                <Pill>Timeline saved</Pill>
+                <Pill>Free: 3 uploads/day</Pill>
+                <Pill>Pro: Unlimited</Pill>
+              </div>
+            </Reveal>
           </div>
-        </Reveal>
 
-        <Reveal delay={0.08}>
-          <h1 className="mt-6 text-balance text-5xl md:text-6xl font-black tracking-tight">
-            Find the{" "}
-            <span className="text-cyan-200 drop-shadow-[0_0_22px_rgba(80,220,255,0.18)]">
-              real price
-            </span>
-            .
-            <br />
-            Negotiate{" "}
-            <span className="text-cyan-300 drop-shadow-[0_0_22px_rgba(80,220,255,0.18)]">
-              smarter
-            </span>
-            .
-          </h1>
-        </Reveal>
-
-        <Reveal delay={0.16}>
-          <p className="mt-5 max-w-2xl text-white/70 text-lg leading-relaxed">
-            Upload a screenshot from Facebook Marketplace / Craigslist and get an
-            instant estimate: market value, deal score, red flags, and a message
-            you can copy-paste.
-          </p>
-        </Reveal>
-
-        <Reveal delay={0.22}>
-          <div className="mt-6 flex flex-wrap gap-2 text-sm text-white/60">
-            <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">
-              Private analysis (no seller contact)
-            </span>
-            <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">
-              Built for Marketplace buyers
-            </span>
-            <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">
-              Best on cars + electronics
-            </span>
-          </div>
-        </Reveal>
-
-        <Reveal delay={0.28}>
-          <div className="mt-7 flex flex-wrap gap-3">
-            <Button href="/app/upload">Analyze your first deal</Button>
-            <Button href="/pricing" variant="ghost">
-              See pricing →
-            </Button>
-          </div>
-        </Reveal>
+          <Reveal delay={0.18}>
+            <GlassCard className="relative overflow-hidden border border-white/10 bg-white/5 p-0">
+              <img src="/hero.png" alt="Deal AI dashboard" className="h-full w-full rounded-3xl object-cover" />
+            </GlassCard>
+          </Reveal>
+        </div>
 
         {/* Trust cards */}
-        <div className="mt-10 grid gap-4 md:grid-cols-3">
+        <div className="mt-12 grid gap-4 md:grid-cols-3">
           <Reveal delay={0.0}>
             <GlassCard className="p-5">
               <div className="text-sm font-semibold">🔒 Private</div>
-              <div className="mt-1 text-sm text-white/70">
-                We don’t message sellers. You control what you send.
-              </div>
+              <div className="mt-1 text-sm text-white/70">We don’t message sellers. You control what you send.</div>
             </GlassCard>
           </Reveal>
           <Reveal delay={0.06}>
             <GlassCard className="p-5">
               <div className="text-sm font-semibold">⚡ Fast</div>
-              <div className="mt-1 text-sm text-white/70">
-                Upload a screenshot → get comps + a counter-offer.
-              </div>
+              <div className="mt-1 text-sm text-white/70">Upload a screenshot → get comps + a counter-offer.</div>
             </GlassCard>
           </Reveal>
           <Reveal delay={0.12}>
             <GlassCard className="p-5">
               <div className="text-sm font-semibold">🧠 Practical</div>
-              <div className="mt-1 text-sm text-white/70">
-                Deal score, scam flags, and negotiation copy that works.
-              </div>
+              <div className="mt-1 text-sm text-white/70">Deal score, scam flags, and negotiation copy that works.</div>
             </GlassCard>
           </Reveal>
         </div>

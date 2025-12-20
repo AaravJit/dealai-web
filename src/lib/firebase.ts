@@ -9,7 +9,7 @@ const firebaseConfig = {
   projectId: "dealai-8f3a2",
   storageBucket: "dealai-8f3a2.firebasestorage.app",
   messagingSenderId: "890679728390",
-  appId: "1:890679728390:web:4c14a10d94d449d422e687"
+  appId: "1:890679728390:web:4c14a10d94d449d422e687",
 };
 
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
